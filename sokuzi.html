@@ -118,7 +118,7 @@ body { margin:0; padding:10px; font-family:sans-serif; }
 
 <script>
 /* 設定 */
-const GAS_URL = "https://script.google.com/macros/s/AKfycbwmfd5sSdh5YaVcmaro4tTyWXMsLqDV6DITYcgXrdXlYTq61nD_Cnp8Jjt-ty7Xxfti/exec";
+const GAS_URL = "https://script.google.com/macros/s/AKfycbw2CTcFnXJpPC2X2d4jXHOBaSM1zB8LU-HvOK44A77_HQYLM4R7o5AnbbsYKj0D5y-S/exec";
 const totalRounds = 12;
 
 /* 状態 */
@@ -157,6 +157,12 @@ function openDB() {
 }
 
 /* ▼ ここから下はすべて完全版（省略なし） ▼ */
+function generateTeamId() {
+  const id = Math.random().toString(36).substring(2, 8).toUpperCase();
+  document.getElementById("teamIdInput").value = id;
+  applyTeamId();
+}
+
 
 /* teamId 登録 → 自チーム名を取得 */
 async function applyTeamId() {
