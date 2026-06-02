@@ -1,15 +1,19 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>Rank Input</title>
+<title>MK Rank Input & History</title>
 <style>
 body { margin:0; padding:10px; font-family:sans-serif; }
+#tabs { display:flex; gap:4px; margin-bottom:10px; }
+.tabBtn { padding:6px 12px; border:1px solid #ccc; background:#f5f5f5; cursor:pointer; }
+.tabBtn.active { background:#4caf50; color:#fff; }
+.tabContent { margin-top:10px; }
 .team-section { margin-bottom:20px; }
 .rank-buttons { display:flex; flex-wrap:wrap; gap:4px; }
 .rank-button {
   width:32px; height:32px; text-align:center; line-height:32px;
-  border:1px solid #ccc; cursor:pointer; border-radius:4px;
+  border:1px solid #ccc; cursor:pointer; border-radius:4px; font-size:12px;
 }
 .rank-button.selected { background:#4caf50; color:white; }
 #penaltyModal {
@@ -17,78 +21,133 @@ body { margin:0; padding:10px; font-family:sans-serif; }
   transform:translate(-50%,-50%); background:white;
   padding:20px; border:2px solid #333; border-radius:10px; z-index:9999;
 }
+.record { border:1px solid #ccc; padding:6px; margin:4px 0; font-size:12px; }
 </style>
 </head>
 <body>
 
-<h2>Rank Input</h2>
-
-<div>
-  <label>モード：</label>
-  <select id="modeSelect">
-    <option value="6v6">6v6</option>
-    <option value="4v4">4v4</option>
-    <option value="3v3">3v3</option>
-  </select>
+<!-- タブ -->
+<div id="tabs">
+  <button class="tabBtn active" data-tab="inputTab">入力</button>
+  <button class="tabBtn" data-tab="historyTab">戦績</button>
 </div>
 
-<br>
+<!-- 入力タブ -->
+<div id="inputTab" class="tabContent" style="display:block;">
 
-<div id="course-container"></div>
+  <h3>チームID登録</h3>
+  <div>
+    <label>チームID：</label>
+    <input id="teamIdInput" placeholder="例：ABC123">
+    <button onclick="applyTeamId()">登録</button>
+    <button onclick="generateTeamId()">新規作成</button>
+  </div>
+  <div id="teamIdStatus" style="margin-top:5px; color:green;"></div>
 
-<div class="button-bar">
-  <button onclick="resetRanks()">リセット</button>
-  <button onclick="openPenaltyTeamSelect()">ペナルティ</button>
+  <hr>
+
+  <h3>モード設定</h3>
+  <div>
+    <label>モード：</label>
+    <select id="modeSelect">
+      <option value="3v3">3v3</option>
+      <option value="4v4">4v4</option>
+      <option value="6v6" selected>6v6</option>
+      <option value="8v8">8v8</option>
+      <option value="12v12">12v12</option>
+    </select>
+  </div>
+
+  <h3>チーム設定</h3>
+  <div>
+    <label>チーム数：</label>
+    <select id="teamCountSelect">
+      <option value="2">2チーム</option>
+      <option value="3">3チーム</option>
+      <option value="4" selected>4チーム</option>
+      <option value="5">5チーム</option>
+      <option value="6">6チーム</option>
+    </select>
+  </div>
+  <br>
+  <div>
+    <label>自チーム：</label>
+    <input id="myTeamInput" value="チーム1">
+  </div>
+  <br>
+  <div id="enemyTeamEditor"></div>
+  <button onclick="applyTeamNames()">チーム名を適用</button>
+
+  <hr>
+
+  <h3>コース選択</h3>
+  <div id="course-container"></div>
+
+  <div class="button-bar" style="margin-top:10px;">
+    <button onclick="resetRanks()">リセット</button>
+    <button onclick="openPenaltyTeamSelect()">ペナルティ</button>
+    <button onclick="saveHistoryRecord()">この試合をローカル保存</button>
+    <button onclick="sendHistoryToGAS()">この試合を共有保存</button>
+  </div>
+
+  <div id="teams-container" style="margin-top:10px;"></div>
+
+  <h3>スコア</h3>
+  <table id="scoreTable" border="1">
+    <thead><tr><th>順位</th><th>チーム</th><th>スコア</th></tr></thead>
+    <tbody></tbody>
+  </table>
+
+  <!-- ペナルティ用モーダル -->
+  <div id="penaltyModal">
+    <h3>ペナルティ対象チームを選択</h3>
+    <div id="penaltyTeamButtons"></div>
+    <button onclick="closePenaltyModal()">閉じる</button>
+  </div>
+
 </div>
 
-<div id="teams-container"></div>
+<!-- 戦績タブ -->
+<div id="historyTab" class="tabContent" style="display:none;">
+  <h3>共有戦績（teamId）</h3>
+  <div id="sharedHistory">teamId を設定してから開いてください。</div>
 
-<h3>スコア</h3>
-<table id="scoreTable" border="1">
-  <thead><tr><th>順位</th><th>チーム</th><th>スコア</th></tr></thead>
-  <tbody></tbody>
-</table>
-
-<!-- ペナルティ用モーダル -->
-<div id="penaltyModal">
-  <h3>ペナルティ対象チームを選択</h3>
-  <div id="penaltyTeamButtons"></div>
-  <button onclick="closePenaltyModal()">閉じる</button>
+  <h3>個人戦績（IndexedDB）</h3>
+  <div id="localHistory"></div>
 </div>
 
 <script>
-/* -----------------------------
-   設定
------------------------------ */
-const GAS_URL = "YOUR_GAS_URL"; // ←ここだけ差し替えれば動く
+/* 設定 */
+const GAS_URL = "YOUR_GAS_URL"; // ←あなたの GAS Web アプリ URL
 const totalRounds = 12;
 
-/* -----------------------------
-   アプリ状態
------------------------------ */
+/* 状態 */
 const state = {
+  teamId: "",
   mode: "6v6",
   teams: ["チーム1","チーム2","チーム3","チーム4"],
+  myTeam: "チーム1",
+  enemyTeams: ["チーム2","チーム3","チーム4"],
   courseList: [
     "マリオカートスタジアム","ウォーターパーク","スイーツキャニオン",
     "ドッスンいせき","マリオサーキット","キノピオハーバー"
   ],
   teamSizeMap: {},
   teamRanks: {},
-  courseNames: Array(12).fill(""),
+  courseNames: Array(totalRounds).fill(""),
   penalty: {},
   currentRound: 0
 };
 
-/* -----------------------------
-   IndexedDB（歴代戦績保存用）
------------------------------ */
+/* IndexedDB（history） */
 function openDB() {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open("mk_history", 1);
     req.onupgradeneeded = e => {
       const db = e.target.result;
-      db.createObjectStore("history", { keyPath:"id" });
+      if (!db.objectStoreNames.contains("history")) {
+        db.createObjectStore("history", { keyPath:"id" });
+      }
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -108,21 +167,54 @@ async function saveHistoryRecord() {
     teamRanks: state.teamRanks,
     teamScores: calculateTeamScores(),
     courseNames: state.courseNames,
-    penalty: state.penalty
+    penalty: state.penalty,
+    synced: false
   };
 
   store.put(record);
   await tx.complete;
-  alert("歴代戦績に保存しました");
+  alert("この試合をローカル（IndexedDB）に保存しました");
 }
 
-/* -----------------------------
-   モード設定
------------------------------ */
+/* チームID */
+function applyTeamId() {
+  const id = document.getElementById("teamIdInput").value.trim();
+  if (!id) {
+    alert("チームIDを入力してください");
+    return;
+  }
+  state.teamId = id;
+  document.getElementById("teamIdStatus").textContent =
+    `チームID「${id}」を使用中`;
+  alert("チームIDを登録しました");
+}
+
+function generateTeamId() {
+  const id = Math.random().toString(36).substring(2, 8).toUpperCase();
+  document.getElementById("teamIdInput").value = id;
+  applyTeamId();
+}
+
+/* モード・チーム構成 */
 function setFormatFromMode(modeStr) {
   state.mode = modeStr;
 
   const size = parseInt(modeStr.split("v")[0]);
+  const totalPlayers = 24;
+  const teamCount = totalPlayers / size;
+
+  // チーム数をモードに合わせて自動調整
+  document.getElementById("teamCountSelect").value = String(teamCount);
+
+  // チーム名再構成（既存の myTeam / enemyTeams を尊重）
+  const names = [];
+  names.push(state.myTeam || "チーム1");
+  for (let i = 1; i < teamCount; i++) {
+    names.push(state.enemyTeams[i-1] || `チーム${i+1}`);
+  }
+  state.teams = names;
+  state.enemyTeams = names.slice(1);
+
   state.teamSizeMap = {};
   state.teams.forEach(team => state.teamSizeMap[team] = size);
 
@@ -132,14 +224,54 @@ function setFormatFromMode(modeStr) {
     for (let r=0; r<totalRounds; r++) state.teamRanks[team][r] = [];
   });
 
+  createTeamNameEditor();
   createCourseSelectors();
   createTeamInputs();
   updateScores();
 }
 
-/* -----------------------------
-   コース選択 UI
------------------------------ */
+/* チーム名編集 UI */
+function createEnemyTeamEditor() {
+  const count = parseInt(document.getElementById("teamCountSelect").value);
+  const container = document.getElementById("enemyTeamEditor");
+  container.innerHTML = "";
+
+  for (let i = 1; i < count; i++) {
+    const name = state.enemyTeams[i-1] || `チーム${i+1}`;
+    const row = document.createElement("div");
+    row.innerHTML = `
+      <label>敵チーム${i}：</label>
+      <input id="enemyTeamInput-${i}" value="${name}">
+    `;
+    container.appendChild(row);
+  }
+}
+
+function createTeamNameEditor() {
+  document.getElementById("myTeamInput").value = state.myTeam;
+  createEnemyTeamEditor();
+}
+
+function applyTeamNames() {
+  const count = parseInt(document.getElementById("teamCountSelect").value);
+
+  const myTeam = document.getElementById("myTeamInput").value.trim() || "自チーム";
+  const enemyTeams = [];
+  for (let i = 1; i < count; i++) {
+    const v = document.getElementById(`enemyTeamInput-${i}`).value.trim();
+    enemyTeams.push(v || `敵チーム${i}`);
+  }
+
+  state.myTeam = myTeam;
+  state.enemyTeams = enemyTeams;
+  state.teams = [myTeam, ...enemyTeams];
+  state.penalty = {};
+
+  setFormatFromMode(state.mode);
+  alert("チーム名を更新しました");
+}
+
+/* コース選択 UI */
 function createCourseSelectors() {
   const container = document.getElementById("course-container");
   container.innerHTML = "";
@@ -156,9 +288,7 @@ function createCourseSelectors() {
   }
 }
 
-/* -----------------------------
-   チーム入力 UI
------------------------------ */
+/* チーム入力 UI */
 function createTeamInputs() {
   const container = document.getElementById("teams-container");
   container.innerHTML = "";
@@ -190,7 +320,6 @@ function createTeamInputs() {
         btn.dataset.team = team;
         btn.dataset.round = round;
         btn.dataset.rank = rank;
-
         btn.onclick = () => toggleRank(team, round, rank, btn);
         row.appendChild(btn);
       }
@@ -203,9 +332,7 @@ function createTeamInputs() {
   }
 }
 
-/* -----------------------------
-   順位入力
------------------------------ */
+/* 順位入力 */
 function toggleRank(team, round, rank, btn) {
   const arr = state.teamRanks[team][round];
   const idx = arr.indexOf(rank);
@@ -226,14 +353,11 @@ function toggleRank(team, round, rank, btn) {
   updateScores();
 }
 
-/* -----------------------------
-   自動補完
------------------------------ */
+/* 自動補完 */
 function autoFillMissingTeam(round) {
   const filled = state.teams.filter(t =>
     state.teamRanks[t][round].length === state.teamSizeMap[t]
   );
-
   if (filled.length < state.teams.length - 1) return;
 
   const used = new Set();
@@ -249,7 +373,6 @@ function autoFillMissingTeam(round) {
     while (arr.length < need && remaining.length > 0) {
       const next = remaining.shift();
       arr.push(next);
-
       const btn = document.querySelector(
         `.rank-button[data-team="${team}"][data-round="${round}"][data-rank="${next}"]`
       );
@@ -258,9 +381,7 @@ function autoFillMissingTeam(round) {
   });
 }
 
-/* -----------------------------
-   スコア計算
------------------------------ */
+/* スコア計算 */
 function getPointsByRank(rank) {
   if (rank===1) return 15;
   if (rank===2) return 12;
@@ -294,12 +415,10 @@ function calculateTeamScores() {
 
 function updateScores() {
   const scores = calculateTeamScores();
-  const results = Object.entries(scores)
-    .sort((a,b)=>b[1]-a[1]);
+  const results = Object.entries(scores).sort((a,b)=>b[1]-a[1]);
 
   const tbody = document.querySelector("#scoreTable tbody");
   tbody.innerHTML = "";
-
   results.forEach(([team,score],i)=>{
     const tr = document.createElement("tr");
     tr.innerHTML = `<td>${i+1}</td><td>${team}</td><td>${score}</td>`;
@@ -309,9 +428,7 @@ function updateScores() {
   sendCurrentToGAS();
 }
 
-/* -----------------------------
-   ラウンド確定
------------------------------ */
+/* ラウンド確定 */
 function confirmRound(round) {
   const course = document.getElementById(`course-select-${round}`).value;
   state.courseNames[round] = course;
@@ -324,74 +441,163 @@ function confirmRound(round) {
       return;
     }
   }
-
   alert(`ラウンド${round+1}を保存しました`);
 }
 
-/* -----------------------------
-   ペナルティ
------------------------------ */
+/* ペナルティ */
 function openPenaltyTeamSelect() {
   const container = document.getElementById("penaltyTeamButtons");
   container.innerHTML = "";
-
   state.teams.forEach(team=>{
     const btn = document.createElement("button");
     btn.textContent = team;
     btn.onclick = ()=>selectPenaltyTeam(team);
     container.appendChild(btn);
   });
-
   document.getElementById("penaltyModal").style.display = "block";
 }
-
 function closePenaltyModal() {
   document.getElementById("penaltyModal").style.display = "none";
 }
-
 function selectPenaltyTeam(team) {
   closePenaltyModal();
   const p = parseInt(prompt(`${team} のペナルティ点数`),10);
   if (!p) return;
-
   state.penalty[team] = (state.penalty[team] || 0) + p;
   updateScores();
 }
 
-/* -----------------------------
-   リセット
------------------------------ */
+/* リセット */
 function resetRanks() {
   if (!confirm("リセットしますか？")) return;
   setFormatFromMode(state.mode);
 }
 
-/* -----------------------------
-   GAS に途中経過送信
------------------------------ */
+/* GAS 送信：途中経過 */
 function sendCurrentToGAS() {
+  if (!state.teamId) return;
   const payload = {
+    teamId: state.teamId,
     teamScores: calculateTeamScores(),
     teams: state.teams,
     timestamp: Date.now()
   };
-
-  fetch(GAS_URL, {
+  fetch(GAS_URL + "?type=current", {
     method:"POST",
     mode:"cors",
     headers:{ "Content-Type":"application/json" },
     body:JSON.stringify(payload)
-  });
+  }).catch(()=>{});
 }
 
-/* -----------------------------
-   初期化
------------------------------ */
+/* GAS 送信：歴代戦績（共有） */
+function sendHistoryToGAS() {
+  if (!state.teamId) {
+    alert("先にチームIDを登録してください");
+    return;
+  }
+  const payload = {
+    teamId: state.teamId,
+    mode: state.mode,
+    teams: state.teams,
+    teamRanks: state.teamRanks,
+    teamScores: calculateTeamScores(),
+    courseNames: state.courseNames,
+    penalty: state.penalty,
+    timestamp: Date.now()
+  };
+  fetch(GAS_URL + "?type=history", {
+    method:"POST",
+    mode:"cors",
+    headers:{ "Content-Type":"application/json" },
+    body:JSON.stringify(payload)
+  }).then(()=>alert("この試合を共有戦績に保存しました"))
+    .catch(()=>alert("共有保存に失敗しました"));
+}
+
+/* 戦績タブ：共有戦績読み込み */
+async function loadSharedHistory() {
+  if (!state.teamId) {
+    document.getElementById("sharedHistory").textContent =
+      "teamId を入力して登録してから開いてください。";
+    return;
+  }
+  try {
+    const res = await fetch(GAS_URL + "?type=history&teamId=" + state.teamId);
+    const data = await res.json();
+    const container = document.getElementById("sharedHistory");
+    if (!data.length) {
+      container.textContent = "共有戦績はまだありません。";
+      return;
+    }
+    container.innerHTML = data.map(r => `
+      <div class="record">
+        <b>${new Date(r.timestamp).toLocaleString()}</b><br>
+        モード: ${r.mode}<br>
+        スコア: ${Object.entries(r.teamScores).map(([t,s])=>`${t}:${s}`).join(" / ")}
+      </div>
+    `).join("");
+  } catch {
+    document.getElementById("sharedHistory").textContent =
+      "共有戦績の取得に失敗しました。";
+  }
+}
+
+/* 戦績タブ：ローカル戦績読み込み */
+async function loadLocalHistory() {
+  try {
+    const db = await openDB();
+    const tx = db.transaction("history","readonly");
+    const store = tx.objectStore("history");
+    const all = await store.getAll();
+    const container = document.getElementById("localHistory");
+    if (!all.length) {
+      container.textContent = "ローカル戦績はまだありません。";
+      return;
+    }
+    container.innerHTML = all.map(r => `
+      <div class="record">
+        <b>${new Date(r.timestamp).toLocaleString()}</b><br>
+        モード: ${r.mode}<br>
+        スコア: ${Object.entries(r.teamScores).map(([t,s])=>`${t}:${s}`).join(" / ")}
+      </div>
+    `).join("");
+  } catch {
+    document.getElementById("localHistory").textContent =
+      "ローカル戦績の取得に失敗しました。";
+  }
+}
+
+/* タブ切り替え */
+document.querySelectorAll(".tabBtn").forEach(btn => {
+  btn.onclick = () => {
+    const target = btn.dataset.tab;
+    document.querySelectorAll(".tabContent").forEach(tab => {
+      tab.style.display = "none";
+    });
+    document.querySelectorAll(".tabBtn").forEach(b => {
+      b.classList.remove("active");
+    });
+    document.getElementById(target).style.display = "block";
+    btn.classList.add("active");
+
+    if (target === "historyTab") {
+      loadSharedHistory();
+      loadLocalHistory();
+    }
+  };
+});
+
+/* イベント・初期化 */
 document.getElementById("modeSelect").onchange = e => {
   setFormatFromMode(e.target.value);
 };
+document.getElementById("teamCountSelect").onchange = () => {
+  createEnemyTeamEditor();
+};
 
 setFormatFromMode("6v6");
+createTeamNameEditor();
 </script>
 
 </body>
