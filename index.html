@@ -1,140 +1,151 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<title>MK Rank Input & History</title>
-<style>
-body { margin:0; padding:10px; font-family:sans-serif; }
-#tabs { display:flex; gap:4px; margin-bottom:10px; }
-.tabBtn { padding:6px 12px; border:1px solid #ccc; background:#f5f5f5; cursor:pointer; }
-.tabBtn.active { background:#4caf50; color:#fff; }
-.tabContent { margin-top:10px; }
-.team-section { margin-bottom:20px; }
-.rank-buttons { display:flex; flex-wrap:wrap; gap:4px; }
-.rank-button {
-  width:32px; height:32px; text-align:center; line-height:32px;
-  border:1px solid #ccc; cursor:pointer; border-radius:4px; font-size:12px;
-}
-.rank-button.selected { background:#4caf50; color:white; }
-#penaltyModal {
-  display:none; position:fixed; top:50%; left:50%;
-  transform:translate(-50%,-50%); background:white;
-  padding:20px; border:2px solid #333; border-radius:10px; z-index:9999;
-}
-.record { border:1px solid #ccc; padding:6px; margin:4px 0; font-size:12px; }
-</style>
+  <meta charset="UTF-8">
+  <title>MKteamsokuzi</title>
+  <style>
+    body { font-family: system-ui, sans-serif; padding: 16px; }
+    h1,h2,h3 { margin: 8px 0; }
+    input, select, button { margin: 4px; padding: 4px 8px; }
+    .flex { display: flex; gap: 8px; flex-wrap: wrap; }
+    .section { border: 1px solid #ccc; padding: 8px; margin-bottom: 12px; }
+    .team-section { border: 1px solid #ddd; padding: 8px; margin: 8px 0; }
+    .rank-buttons { display: flex; flex-wrap: wrap; gap: 2px; margin-bottom: 8px; }
+    .rank-button {
+      width: 28px; height: 24px; font-size: 11px;
+      border: 1px solid #aaa; text-align: center; cursor: pointer;
+      user-select: none;
+    }
+    .rank-button.selected {
+      background: #007bff; color: #fff; border-color: #0056b3;
+    }
+    table { border-collapse: collapse; margin-top: 8px; }
+    th, td { border: 1px solid #ccc; padding: 4px 8px; text-align: center; }
+    .tabs { display: flex; gap: 4px; margin-bottom: 8px; }
+    .tabBtn { padding: 4px 8px; cursor: pointer; border: 1px solid #ccc; background: #eee; }
+    .tabBtn.active { background: #ddd; font-weight: bold; }
+    .tabContent { display: none; }
+    .record { border: 1px solid #ccc; padding: 6px; margin: 4px 0; font-size: 13px; }
+    #penaltyModal {
+      position: fixed; inset: 0; background: rgba(0,0,0,0.4);
+      display: none; align-items: center; justify-content: center;
+    }
+    #penaltyModalInner {
+      background: #fff; padding: 12px; border-radius: 4px; min-width: 200px;
+    }
+  </style>
 </head>
 <body>
 
-<!-- タブ -->
-<div id="tabs">
-  <button class="tabBtn active" data-tab="inputTab">入力</button>
-  <button class="tabBtn" data-tab="historyTab">戦績</button>
-</div>
+<h1>MKteamsokuzi – GitHub API 保存版</h1>
 
-<!-- 入力タブ -->
-<div id="inputTab" class="tabContent" style="display:block;">
-
-  <h3>チームID登録</h3>
+<div class="section">
+  <h2>チーム設定</h2>
   <div>
     <label>チームID：</label>
-    <input id="teamIdInput" placeholder="例：ABC123">
+    <input id="teamIdInput" placeholder="例: ABC123" />
+    <button onclick="generateTeamId()">自動生成</button>
     <button onclick="applyTeamId()">登録</button>
-    <button onclick="generateTeamId()">新規作成</button>
   </div>
-  <div id="teamIdStatus" style="margin-top:5px; color:green;"></div>
+  <div id="teamIdStatus" style="margin:4px 0;"></div>
 
-  <hr>
-
-  <h3>モード設定</h3>
   <div>
+    <label>自チーム名：</label>
+    <input id="myTeamInput" />
+    <button onclick="saveMyTeamName()">自チーム名を保存</button>
+  </div>
+
+  <div style="margin-top:8px;">
     <label>モード：</label>
     <select id="modeSelect">
-      <option value="3v3">3v3</option>
+      <option value="6v6">6v6</option>
       <option value="4v4">4v4</option>
-      <option value="6v6" selected>6v6</option>
-      <option value="8v8">8v8</option>
-      <option value="12v12">12v12</option>
+      <option value="3v3">3v3</option>
+      <option value="2v2">2v2</option>
     </select>
-  </div>
 
-  <h3>チーム設定</h3>
-  <div>
     <label>チーム数：</label>
     <select id="teamCountSelect">
-      <option value="2">2チーム</option>
-      <option value="3">3チーム</option>
-      <option value="4" selected>4チーム</option>
-      <option value="5">5チーム</option>
-      <option value="6">6チーム</option>
+      <option value="2">2</option>
+      <option value="3">3</option>
+      <option value="4" selected>4</option>
+      <option value="6">6</option>
+      <option value="8">8</option>
+      <option value="12">12</option>
     </select>
-  </div>
-  <br>
-  <div>
-    <label>自チーム：</label>
-    <input id="myTeamInput" value="チーム1">
-  </div>
-  <br>
-  <div id="enemyTeamEditor"></div>
-  <button onclick="applyTeamNames(); saveMyTeamName();">チーム名を適用</button>
-
-  <hr>
-
-  <h3>コース選択</h3>
-  <div id="course-container"></div>
-
-  <div class="button-bar" style="margin-top:10px;">
-    <button onclick="resetRanks()">リセット</button>
-    <button onclick="openPenaltyTeamSelect()">ペナルティ</button>
-    <button onclick="saveHistoryRecord()">この試合をローカル保存</button>
-    <button onclick="sendHistoryToGAS()">この試合を共有保存</button>
+    <button onclick="applyTeamNames()">チーム名を反映</button>
   </div>
 
-  <div id="teams-container" style="margin-top:10px;"></div>
-
-  <h3>スコア</h3>
-  <table id="scoreTable" border="1">
-    <thead><tr><th>順位</th><th>チーム</th><th>スコア</th></tr></thead>
-    <tbody></tbody>
-  </table>
-
-  <!-- ペナルティ用モーダル -->
-  <div id="penaltyModal">
-    <h3>ペナルティ対象チームを選択</h3>
-    <div id="penaltyTeamButtons"></div>
-    <button onclick="closePenaltyModal()">閉じる</button>
-  </div>
-
+  <div id="enemyTeamEditor" style="margin-top:8px;"></div>
 </div>
 
-<!-- 戦績タブ -->
-<div id="historyTab" class="tabContent" style="display:none;">
-  <h3>共有戦績（teamId）</h3>
-  <div id="sharedHistory">teamId を設定してから開いてください。</div>
+<div class="section">
+  <h2>コース選択</h2>
+  <div id="course-container"></div>
+</div>
 
-  <h3>個人戦績（IndexedDB）</h3>
-  <div id="localHistory"></div>
+<div class="section">
+  <h2>順位入力</h2>
+  <div id="teams-container"></div>
+</div>
+
+<div class="section">
+  <h2>スコア</h2>
+  <button onclick="openPenaltyTeamSelect()">ペナルティ入力</button>
+  <button onclick="resetRanks()">リセット</button>
+  <table id="scoreTable">
+    <thead>
+      <tr><th>順位</th><th>チーム</th><th>スコア</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+  <div style="margin-top:8px;">
+    <button onclick="saveHistoryToGitHub()">この試合を GitHub に保存</button>
+    <button onclick="saveHistoryRecord()">この試合をローカルに保存</button>
+  </div>
+</div>
+
+<div class="section">
+  <h2>戦績</h2>
+  <div class="tabs">
+    <button class="tabBtn active" data-tab="historyTab">共有戦績</button>
+    <button class="tabBtn" data-tab="localTab">ローカル戦績</button>
+  </div>
+  <div id="historyTab" class="tabContent" style="display:block;">
+    <button onclick="loadSharedHistory()">共有戦績を読み込み</button>
+    <div id="sharedHistory" style="margin-top:8px;"></div>
+  </div>
+  <div id="localTab" class="tabContent">
+    <button onclick="loadLocalHistory()">ローカル戦績を読み込み</button>
+    <div id="localHistory" style="margin-top:8px;"></div>
+  </div>
+</div>
+
+<div id="penaltyModal">
+  <div id="penaltyModalInner">
+    <h3>ペナルティ対象チーム選択</h3>
+    <div id="penaltyTeamButtons" style="margin:8px 0;"></div>
+    <button onclick="closePenaltyModal()">閉じる</button>
+  </div>
 </div>
 
 <script>
-/* 設定 */
-const GAS_URL = "https://script.google.com/macros/s/AKfycbx7NyDZJJgQWUlut714WFBKSLDC7SHVyvHQAnFDwoZn3nTwZLjzsRlGc3JAWvLBxTwl/exec";
+/* ===== 設定 ===== */
 const totalRounds = 12;
+const GITHUB_REPO = "sorute03/MKteamsokuzi"; // 保存先リポジトリ
+const GITHUB_TOKEN = "YOUR_TOKEN_HERE";      // ★本物は絶対にコミットしないこと
 
-  
-/* 状態 */
+/* ===== 状態 ===== */
 const state = {
   teamId: "",
   mode: "6v6",
   teams: ["チーム1","チーム2","チーム3","チーム4"],
   myTeam: "チーム1",
   enemyTeams: ["チーム2","チーム3","チーム4"],
-
-  /* ▼ コースリストはここに入れる（省略版） ▼ */
   courseList: [
-    /* ← ここにあなたの巨大 courseList 全部を入れる */
+    // ここにコース名一覧を入れる
+    "コースA","コースB","コースC","コースD"
   ],
-
   teamSizeMap: {},
   teamRanks: {},
   courseNames: Array(totalRounds).fill(""),
@@ -142,7 +153,7 @@ const state = {
   currentRound: 0
 };
 
-/* IndexedDB（history） */
+/* ===== IndexedDB（history） ===== */
 function openDB() {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open("mk_history", 1);
@@ -157,68 +168,85 @@ function openDB() {
   });
 }
 
-/* ▼ ここから下はすべて完全版（省略なし） ▼ */
+/* ===== GitHub API ヘルパー ===== */
+async function saveToGitHub(path, jsonData) {
+  const url = `https://api.github.com/repos/${GITHUB_REPO}/contents/${path}`;
+  const content = btoa(JSON.stringify(jsonData, null, 2));
+  const body = {
+    message: "save data",
+    content: content
+  };
+  const res = await fetch(url, {
+    method: "PUT",
+    headers: {
+      "Authorization": `Bearer ${GITHUB_TOKEN}`,
+      "Content-Type": "application/json",
+      "Accept": "application/vnd.github+json"
+    },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) {
+    console.error(await res.text());
+    throw new Error("GitHub 保存失敗");
+  }
+  return await res.json();
+}
+
+async function loadFromGitHub(path) {
+  const url = `https://api.github.com/repos/${GITHUB_REPO}/contents/${path}`;
+  const res = await fetch(url);
+  if (!res.ok) return null;
+  const data = await res.json();
+  return JSON.parse(atob(data.content));
+}
+
+/* ===== チームID関連 ===== */
 function generateTeamId() {
   const id = Math.random().toString(36).substring(2, 8).toUpperCase();
   document.getElementById("teamIdInput").value = id;
   applyTeamId();
 }
 
-
-/* teamId 登録 → 自チーム名を取得 */
 async function applyTeamId() {
   const id = document.getElementById("teamIdInput").value.trim();
   if (!id) {
     alert("チームIDを入力してください");
     return;
   }
-
   state.teamId = id;
   document.getElementById("teamIdStatus").textContent =
     `チームID「${id}」を使用中`;
 
-  // ▼ 自チーム名を取得
-  const res = await fetch(GAS_URL + `?type=teamName&teamId=${id}`);
-  const data = await res.json();
-
-  if (data.myTeamName) {
-    state.myTeam = data.myTeamName;
-    document.getElementById("myTeamInput").value = data.myTeamName;
+  // 自チーム名読み込み
+  try {
+    const data = await loadFromGitHub(`teamName/${id}.json`);
+    if (data && data.myTeamName) {
+      state.myTeam = data.myTeamName;
+      document.getElementById("myTeamInput").value = data.myTeamName;
+    }
+  } catch (e) {
+    console.log("自チーム名読み込み失敗", e);
   }
 
   alert("チームIDを登録しました");
 }
 
-/* 自チーム名を GAS に保存 */
+/* 自チーム名保存（GitHub） */
 async function saveMyTeamName() {
   if (!state.teamId) {
     alert("先にチームIDを登録してください");
     return;
   }
-
   const name = document.getElementById("myTeamInput").value.trim();
   if (!name) return;
-
   state.myTeam = name;
-
-  await fetch(GAS_URL + "?type=teamName", {
-    method: "POST",
-    mode: "cors",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      teamId: state.teamId,
-      myTeamName: name
-    })
-  });
-
+  await saveToGitHub(`teamName/${state.teamId}.json`, { myTeamName: name });
   alert("自チーム名をチームIDにリンクしました");
 }
 
-/* 以下、順位入力・スコア計算・同期などすべて完全版（省略なし） */
-
+/* ===== フォーマット・UI構築 ===== */
 function setFormatFromMode(modeStr) {
   state.mode = modeStr;
-
   const size = parseInt(modeStr.split("v")[0]);
   const totalPlayers = 24;
   const teamCount = totalPlayers / size;
@@ -252,7 +280,6 @@ function createEnemyTeamEditor() {
   const count = parseInt(document.getElementById("teamCountSelect").value);
   const container = document.getElementById("enemyTeamEditor");
   container.innerHTML = "";
-
   for (let i = 1; i < count; i++) {
     const name = state.enemyTeams[i-1] || `チーム${i+1}`;
     const row = document.createElement("div");
@@ -271,19 +298,16 @@ function createTeamNameEditor() {
 
 function applyTeamNames() {
   const count = parseInt(document.getElementById("teamCountSelect").value);
-
   const myTeam = document.getElementById("myTeamInput").value.trim() || "自チーム";
   const enemyTeams = [];
   for (let i = 1; i < count; i++) {
     const v = document.getElementById(`enemyTeamInput-${i}`).value.trim();
     enemyTeams.push(v || `敵チーム${i}`);
   }
-
   state.myTeam = myTeam;
   state.enemyTeams = enemyTeams;
   state.teams = [myTeam, ...enemyTeams];
   state.penalty = {};
-
   setFormatFromMode(state.mode);
   alert("チーム名を更新しました");
 }
@@ -291,7 +315,6 @@ function applyTeamNames() {
 function createCourseSelectors() {
   const container = document.getElementById("course-container");
   container.innerHTML = "";
-
   for (let i=0; i<totalRounds; i++) {
     const row = document.createElement("div");
     row.innerHTML = `
@@ -307,7 +330,6 @@ function createCourseSelectors() {
 function createTeamInputs() {
   const container = document.getElementById("teams-container");
   container.innerHTML = "";
-
   for (let round=0; round<totalRounds; round++) {
     const section = document.createElement("div");
     section.className = "team-section";
@@ -347,10 +369,10 @@ function createTeamInputs() {
   }
 }
 
+/* ===== 順位入力・スコア計算 ===== */
 function toggleRank(team, round, rank, btn) {
   const arr = state.teamRanks[team][round];
   const idx = arr.indexOf(rank);
-
   if (idx >= 0) {
     arr.splice(idx,1);
     btn.classList.remove("selected");
@@ -362,7 +384,6 @@ function toggleRank(team, round, rank, btn) {
       alert(`${team} は最大 ${state.teamSizeMap[team]} 人です`);
     }
   }
-
   autoFillMissingTeam(round);
   updateScores();
 }
@@ -437,7 +458,7 @@ function updateScores() {
     tbody.appendChild(tr);
   });
 
-  sendCurrentToGAS();
+  saveCurrentToGitHub();
 }
 
 function confirmRound(round) {
@@ -455,6 +476,7 @@ function confirmRound(round) {
   alert(`ラウンド${round+1}を保存しました`);
 }
 
+/* ===== ペナルティ ===== */
 function openPenaltyTeamSelect() {
   const container = document.getElementById("penaltyTeamButtons");
   container.innerHTML = "";
@@ -477,12 +499,14 @@ function selectPenaltyTeam(team) {
   updateScores();
 }
 
+/* ===== リセット ===== */
 function resetRanks() {
   if (!confirm("リセットしますか？")) return;
   setFormatFromMode(state.mode);
 }
 
-function sendCurrentToGAS() {
+/* ===== GitHub 保存（current / history） ===== */
+async function saveCurrentToGitHub() {
   if (!state.teamId) return;
   const payload = {
     teamId: state.teamId,
@@ -490,15 +514,14 @@ function sendCurrentToGAS() {
     teams: state.teams,
     timestamp: Date.now()
   };
-  fetch(GAS_URL + "?type=current", {
-    method:"POST",
-    mode:"cors",
-    headers:{ "Content-Type":"application/json" },
-    body:JSON.stringify(payload)
-  }).catch(()=>{});
+  try {
+    await saveToGitHub(`current/${state.teamId}.json`, payload);
+  } catch (e) {
+    console.log("current 保存失敗", e);
+  }
 }
 
-function sendHistoryToGAS() {
+async function saveHistoryToGitHub() {
   if (!state.teamId) {
     alert("先にチームIDを登録してください");
     return;
@@ -513,16 +536,12 @@ function sendHistoryToGAS() {
     penalty: state.penalty,
     timestamp: Date.now()
   };
-  fetch(GAS_URL + "?type=history", {
-    method:"POST",
-    mode:"cors",
-    headers:{ "Content-Type":"application/json" },
-    body:JSON.stringify(payload)
-  }).then(()=>alert("この試合を共有戦績に保存しました"))
-    .catch(()=>alert("共有保存に失敗しました"));
+  const filename = `${state.teamId}/${payload.timestamp}.json`;
+  await saveToGitHub(`history/${filename}`, payload);
+  alert("この試合を GitHub に保存しました");
 }
 
-/* ローカル保存 */
+/* ===== ローカル保存 ===== */
 async function saveHistoryRecord() {
   const db = await openDB();
   const tx = db.transaction("history","readwrite");
@@ -545,40 +564,7 @@ async function saveHistoryRecord() {
   alert("この試合をローカル（IndexedDB）に保存しました");
 }
 
-/* 6時間ごとの差分同期（IndexedDB → GAS） */
-async function syncHistoryToGAS() {
-  if (!state.teamId) return;
-
-  try {
-    const db = await openDB();
-    const tx = db.transaction("history", "readwrite");
-    const store = tx.objectStore("history");
-
-    const all = await store.getAll();
-    const unsynced = all.filter(r => !r.synced);
-
-    for (const record of unsynced) {
-      await fetch(GAS_URL + "?type=history", {
-        method: "POST",
-        mode: "cors",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          teamId: state.teamId,
-          ...record
-        })
-      });
-      record.synced = true;
-      store.put(record);
-    }
-
-    await tx.complete;
-    console.log("同期完了（未同期データを送信しました）");
-  } catch (e) {
-    console.log("同期失敗", e);
-  }
-}
-
-/* 共有戦績読み込み */
+/* ===== 共有戦績読み込み（GitHub） ===== */
 async function loadSharedHistory() {
   if (!state.teamId) {
     document.getElementById("sharedHistory").textContent =
@@ -586,27 +572,34 @@ async function loadSharedHistory() {
     return;
   }
   try {
-    const res = await fetch(GAS_URL + "?type=history&teamId=" + state.teamId);
-    const data = await res.json();
+    const url = `https://api.github.com/repos/${GITHUB_REPO}/contents/history/${state.teamId}`;
+    const res = await fetch(url);
     const container = document.getElementById("sharedHistory");
-    if (!data.length) {
+    if (!res.ok) {
       container.textContent = "共有戦績はまだありません。";
       return;
     }
-    container.innerHTML = data.map(r => `
+    const files = await res.json();
+    const results = [];
+    for (const f of files) {
+      const data = await loadFromGitHub(`history/${state.teamId}/${f.name}`);
+      if (data) results.push(data);
+    }
+    results.sort((a,b)=>b.timestamp - a.timestamp);
+    container.innerHTML = results.map(r => `
       <div class="record">
         <b>${new Date(r.timestamp).toLocaleString()}</b><br>
         モード: ${r.mode}<br>
         スコア: ${Object.entries(r.teamScores).map(([t,s])=>`${t}:${s}`).join(" / ")}
       </div>
     `).join("");
-  } catch {
+  } catch (e) {
     document.getElementById("sharedHistory").textContent =
       "共有戦績の取得に失敗しました。";
   }
 }
 
-/* ローカル戦績読み込み */
+/* ===== ローカル戦績読み込み ===== */
 async function loadLocalHistory() {
   try {
     const db = await openDB();
@@ -631,7 +624,7 @@ async function loadLocalHistory() {
   }
 }
 
-/* タブ切り替え */
+/* ===== タブ切り替え ===== */
 document.querySelectorAll(".tabBtn").forEach(btn => {
   btn.onclick = () => {
     const target = btn.dataset.tab;
@@ -651,106 +644,14 @@ document.querySelectorAll(".tabBtn").forEach(btn => {
   };
 });
 
-async function saveToGitHub(path, jsonData) {
-  const token = "TOKEN"; // ← ここにトークン
-  const repo = "sorute03/MKteamsokuzi";      // ← 保存先リポジトリ
-
-  const url = `https://api.github.com/repos/${repo}/contents/${path}`;
-
-  const content = btoa(JSON.stringify(jsonData, null, 2));
-
-  const body = {
-    message: "save data",
-    content: content
-  };
-
-  const res = await fetch(url, {
-    method: "PUT",
-    headers: {
-      "Authorization": `Bearer ${token}`,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify(body)
-  });
-
-  if (!res.ok) {
-    console.error(await res.text());
-    throw new Error("GitHub 保存失敗");
-  }
-
-  return await res.json();
-}
-
-async function loadFromGitHub(path) {
-  const repo = "sorute03/MKteamsokuzi"; 
-
-  const url = `https://api.github.com/repos/${repo}/contents/${path}`;
-
-  const res = await fetch(url);
-  if (!res.ok) return null;
-
-  const data = await res.json();
-  const decoded = JSON.parse(atob(data.content));
-  return decoded;
-}
-
-async function saveHistoryToGitHub() {
-  if (!state.teamId) {
-    alert("teamId を登録してください");
-    return;
-  }
-
-  const payload = {
-    teamId: state.teamId,
-    mode: state.mode,
-    teams: state.teams,
-    teamRanks: state.teamRanks,
-    teamScores: calculateTeamScores(),
-    courseNames: state.courseNames,
-    penalty: state.penalty,
-    timestamp: Date.now()
-  };
-
-  const filename = `${state.teamId}/${payload.timestamp}.json`;
-
-  await saveToGitHub(`history/${filename}`, payload);
-
-  alert("GitHub に戦績を保存しました");
-}
-
-async function loadSharedHistoryFromGitHub() {
-  if (!state.teamId) return [];
-
-  const repo = "sorute03/MKADP-data";
-  const url = `https://api.github.com/repos/${repo}/contents/history/${state.teamId}`;
-
-  const res = await fetch(url);
-  if (!res.ok) return [];
-
-  const files = await res.json();
-
-  const results = [];
-  for (const f of files) {
-    const data = await loadFromGitHub(`history/${state.teamId}/${f.name}`);
-    if (data) results.push(data);
-  }
-
-  return results.sort((a,b)=>b.timestamp - a.timestamp);
-}
-
-
-  
-/* 6時間ごとに共有戦績を自動更新（historyタブが表示中のみ） */
+/* ===== 自動更新（共有戦績のみ） ===== */
 setInterval(() => {
   if (document.getElementById("historyTab").style.display === "block") {
     loadSharedHistory();
   }
 }, 6 * 60 * 60 * 1000);
 
-/* 6時間ごとにローカル→GAS 同期 */
-setInterval(syncHistoryToGAS, 6 * 60 * 60 * 1000);
-
-/* イベント・初期化 */
+/* ===== 初期化 ===== */
 document.getElementById("modeSelect").onchange = e => {
   setFormatFromMode(e.target.value);
 };
@@ -764,4 +665,3 @@ createTeamNameEditor();
 
 </body>
 </html>
-
