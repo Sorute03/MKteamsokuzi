@@ -408,3 +408,271 @@ function downloadResultImage() {
 function openOverlay() {
   window.open("overlay.html", "_blank");
 }
+
+/* ============================================================
+   IndexedDB 初期化
+============================================================ */
+let db;
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open("MK_SOKUZI_DB", 1);
+
+    req.onupgradeneeded = e => {
+      db = e.target.result;
+      db.createObjectStore("save", { keyPath: "id" });
+    };
+
+    req.onsuccess = e => {
+      db = e.target.result;
+      resolve();
+    };
+
+    req.onerror = e => reject(e);
+  });
+}
+
+/* ============================================================
+   IndexedDB 保存（試合データのみ）
+============================================================ */
+async function saveToIndexedDB() {
+  const tx = db.transaction("save", "readwrite");
+  const store = tx.objectStore("save");
+
+  const data = {
+    id: "main",
+    teams: state.teams,
+    courses: state.courses,
+    teamRanks: state.teamRanks,
+    penalty: state.penalty
+  };
+
+  store.put(data);
+}
+
+/* ============================================================
+   IndexedDB 読み込み（起動時）
+============================================================ */
+async function loadFromIndexedDB() {
+  const tx = db.transaction("save", "readonly");
+  const store = tx.objectStore("save");
+
+  const req = store.get("main");
+
+  req.onsuccess = () => {
+    const data = req.result;
+    if (!data) return;
+
+    state.teams = data.teams || [];
+    state.courses = data.courses || [];
+    state.teamRanks = data.teamRanks || {};
+    state.penalty = data.penalty || 0;
+
+    renderRounds();
+    renderScoreTable();
+  };
+}
+
+/* ============================================================
+   JSON エクスポート（試合データのみ）
+============================================================ */
+function exportJSON() {
+  const data = {
+    teams: state.teams,
+    courses: state.courses,
+    teamRanks: state.teamRanks,
+    penalty: state.penalty
+  };
+
+  document.getElementById("jsonArea").value = JSON.stringify(data, null, 2);
+}
+
+/* ============================================================
+   JSON インポート（試合データのみ）
+============================================================ */
+function importJSON() {
+  try {
+    const data = JSON.parse(document.getElementById("jsonArea").value);
+
+    state.teams = data.teams || [];
+    state.courses = data.courses || [];
+    state.teamRanks = data.teamRanks || {};
+    state.penalty = data.penalty || 0;
+
+    renderRounds();
+    renderScoreTable();
+
+    saveToIndexedDB();
+
+    alert("JSON を読み込みました");
+  } catch (e) {
+    alert("JSON の形式が正しくありません");
+  }
+}
+
+/* ============================================================
+   JSON ファイル保存（download）
+============================================================ */
+function downloadJSONFile() {
+  const data = {
+    teams: state.teams,
+    courses: state.courses,
+    teamRanks: state.teamRanks,
+    penalty: state.penalty
+  };
+
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "mk_sokuzi_data.json";
+  a.click();
+
+  URL.revokeObjectURL(url);
+}
+
+/* ============================================================
+   JSON ファイル読み込み（upload）
+============================================================ */
+function uploadJSONFile(file) {
+  const reader = new FileReader();
+
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+
+      state.teams = data.teams || [];
+      state.courses = data.courses || [];
+      state.teamRanks = data.teamRanks || {};
+      state.penalty = data.penalty || 0;
+
+      renderRounds();
+      renderScoreTable();
+
+      saveToIndexedDB();
+
+      alert("JSON ファイルを読み込みました");
+    } catch (e) {
+      alert("JSON の形式が正しくありません");
+    }
+  };
+
+  reader.readAsText(file);
+}
+
+/* ============================================================
+   特定チームだけ JSON 化（テキスト出力）
+============================================================ */
+function exportTeamJSON(teamName) {
+  if (!state.teams.includes(teamName)) {
+    alert("指定されたチームが存在しません");
+    return;
+  }
+
+  const filteredRanks = {};
+
+  for (let r = 0; r < 12; r++) {
+    if (!state.teamRanks[r]) continue;
+    filteredRanks[r] = { [teamName]: state.teamRanks[r][teamName] };
+  }
+
+  const data = {
+    team: teamName,
+    teams: state.teams,
+    courses: state.courses,
+    teamRanks: filteredRanks,
+    penalty: state.penalty
+  };
+
+  document.getElementById("jsonArea").value = JSON.stringify(data, null, 2);
+}
+
+/* ============================================================
+   特定チームだけ JSON ファイル保存
+============================================================ */
+function downloadTeamJSONFile(teamName) {
+  if (!state.teams.includes(teamName)) {
+    alert("指定されたチームが存在しません");
+    return;
+  }
+
+  const filteredRanks = {};
+
+  for (let r = 0; r < 12; r++) {
+    if (!state.teamRanks[r]) continue;
+    filteredRanks[r] = { [teamName]: state.teamRanks[r][teamName] };
+  }
+
+  const data = {
+    team: teamName,
+    teams: state.teams,
+    courses: state.courses,
+    teamRanks: filteredRanks,
+    penalty: state.penalty
+  };
+
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `mk_sokuzi_${teamName}.json`;
+  a.click();
+
+  URL.revokeObjectURL(url);
+}
+
+/* ============================================================
+   JSON Drag & Drop 読み込み
+============================================================ */
+const dropArea = document.getElementById("jsonDropArea");
+
+// ▼ デフォルト動作を無効化
+["dragenter", "dragover", "dragleave", "drop"].forEach(eventName => {
+  dropArea.addEventListener(eventName, e => e.preventDefault());
+});
+
+// ▼ 視覚効果
+dropArea.addEventListener("dragover", () => {
+  dropArea.style.background = "#e0f7ff";
+});
+dropArea.addEventListener("dragleave", () => {
+  dropArea.style.background = "#fafafa";
+});
+
+// ▼ ドロップ処理
+dropArea.addEventListener("drop", e => {
+  dropArea.style.background = "#fafafa";
+
+  const file = e.dataTransfer.files[0];
+  if (!file) return;
+
+  if (!file.name.endsWith(".json")) {
+    alert("JSON ファイルをドロップしてください");
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+
+      state.teams = data.teams || [];
+      state.courses = data.courses || [];
+      state.teamRanks = data.teamRanks || {};
+      state.penalty = data.penalty || 0;
+
+      renderRounds();
+      renderScoreTable();
+
+      saveToIndexedDB();
+
+      alert("JSON ファイルを読み込みました");
+    } catch (err) {
+      alert("JSON の形式が正しくありません");
+    }
+  };
+
+  reader.readAsText(file);
+});
