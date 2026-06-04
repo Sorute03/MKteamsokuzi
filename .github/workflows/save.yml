@@ -1,0 +1,22 @@
+name: Save JSON to GitHub
+
+on:
+  repository_dispatch:
+    types: [save]
+
+jobs:
+  save:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Save JSON
+        env:
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          REPO: Sorute03/MKteamsokuzi
+          PATH: ${{ github.event.client_payload.path }}
+          CONTENT: ${{ github.event.client_payload.content }}
+        run: |
+          curl -X PUT \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{\"message\":\"save data\",\"content\":\"$CONTENT\"}" \
+            "https://api.github.com/repos/$REPO/contents/$PATH"
