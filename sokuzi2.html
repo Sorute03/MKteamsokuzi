@@ -1,144 +1,175 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html>
 <head>
 <meta charset="UTF-8">
-<title>MK Sokuzi</title>
+<title>MK Rank Input</title>
+
 <style>
-body {
-  font-family: sans-serif;
-  margin: 0;
-  padding: 0;
-  background: #f5f5f5;
+body { margin:0; padding:10px; font-family:sans-serif; }
+#tabs { display:flex; gap:4px; margin-bottom:10px; }
+.tabBtn { padding:6px 12px; border:1px solid #ccc; background:#f5f5f5; cursor:pointer; }
+.tabBtn.active { background:#4caf50; color:#fff; }
+.tabContent { margin-top:10px; }
+.team-section { margin-bottom:20px; }
+.rank-buttons { display:flex; flex-wrap:wrap; gap:4px; }
+.rank-button {
+  width:32px; height:32px; text-align:center; line-height:32px;
+  border:1px solid #ccc; cursor:pointer; border-radius:4px; font-size:12px;
 }
-
-/* タブ */
-.tab {
-  display: flex;
-  background: #333;
+.rank-button.selected { background:#4caf50; color:white; }
+#penaltyModal {
+  display:none; position:fixed; top:50%; left:50%;
+  transform:translate(-50%,-50%); background:white;
+  padding:20px; border:2px solid #333; border-radius:10px; z-index:9999;
 }
-.tab button {
-  flex: 1;
-  padding: 12px;
-  background: #444;
-  color: white;
-  border: none;
-  cursor: pointer;
-}
-.tab button.active {
-  background: #666;
-}
-
-/* セクション */
-.section {
-  padding: 20px;
-  background: white;
-  margin: 10px;
-  border-radius: 10px;
-}
-
-/* ラウンド入力 */
-.roundBox {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-.roundBox select, .roundBox input {
-  padding: 6px;
-}
-
-/* スコアテーブル */
-#scoreTable {
-  width: 100%;
-  border-collapse: collapse;
-}
-#scoreTable th, #scoreTable td {
-  border: 1px solid #ccc;
-  padding: 6px;
-  text-align: center;
-}
-
-/* リザルト画像 */
-#resultImageLocal {
-  max-width: 100%;
-  border: 1px solid #ccc;
-  border-radius: 10px;
+.record { border:1px solid #ccc; padding:6px; margin:4px 0; font-size:12px; }
+#jsonDropArea {
+  width:100%; height:120px; border:2px dashed #888; border-radius:10px;
+  display:flex; align-items:center; justify-content:center; background:#fafafa;
 }
 </style>
 </head>
-
 <body>
 
-<!-- ▼ タブ -->
-<div class="tab">
-  <button class="active" onclick="openTab('inputTab')">入力</button>
-  <button onclick="openTab('historyTab')">履歴</button>
-  <button onclick="openTab('jsonTab')">JSON</button>
-  <button onclick="openTab('p2pTab')">P2P</button>
+<!-- タブ -->
+<div id="tabs">
+  <button class="tabBtn active" data-tab="inputTab">入力</button>
+  <button class="tabBtn" data-tab="historyTab">戦績</button>
+  <button class="tabBtn" data-tab="jsonTab">JSON</button>
+  <button class="tabBtn" data-tab="p2pTab">P2P</button>
+  <button class="tabBtn" data-tab="resultTab">リザルト</button>
 </div>
 
-<!-- ▼ 入力タブ -->
-<div id="inputTab" class="section">
+<!-- 入力タブ -->
+<div id="inputTab" class="tabContent" style="display:block;">
 
-  <h2>チーム設定</h2>
-  <input id="teamInput" placeholder="A,B,C,D">
-  <button onclick="setTeams()">設定</button>
+  <h3>モード設定</h3>
+  <div>
+    <label>モード：</label>
+    <select id="modeSelect" onchange="setFormatFromMode(this.value)">
+      <option value="3v3">3v3</option>
+      <option value="4v4">4v4</option>
+      <option value="6v6" selected>6v6</option>
+      <option value="8v8">8v8</option>
+      <option value="12v12">12v12</option>
+    </select>
+  </div>
 
-  <h2>コース設定</h2>
-  <input id="courseInput" placeholder="コース名をカンマ区切りで">
-  <button onclick="setCourses()">設定</button>
+  <h3>チーム設定</h3>
+  <div>
+    <label>チーム数：</label>
+    <select id="teamCountSelect" onchange="createEnemyTeamEditor()">
+      <option value="2">2チーム</option>
+      <option value="3">3チーム</option>
+      <option value="4" selected>4チーム</option>
+      <option value="5">5チーム</option>
+      <option value="6">6チーム</option>
+    </select>
+  </div>
+  <br>
+  <div>
+    <label>自チーム：</label>
+    <input id="myTeamInput" value="チーム1">
+  </div>
+  <br>
+  <div id="enemyTeamEditor"></div>
+  <button onclick="applyTeamNames()">チーム名を適用</button>
 
-  <h2>ラウンド入力</h2>
-  <div id="roundContainer"></div>
+  <hr>
 
-  <h2>ペナルティ</h2>
-  <input id="penaltyInput" type="number" value="0">
-  <button onclick="applyPenalty()">適用</button>
+  <h3>コース選択</h3>
+  <div id="course-container"></div>
 
-  <h2>スコア</h2>
-  <table id="scoreTable"></table>
+  <div class="button-bar" style="margin-top:10px;">
+    <button onclick="resetRanks()">リセット</button>
+    <button onclick="openPenaltyTeamSelect()">ペナルティ</button>
+    <button onclick="saveHistoryRecord()">この試合をローカル保存</button>
+    <button onclick="sendHistoryToGAS()">この試合を共有保存</button>
+  </div>
 
-  <h2>リザルト背景画像</h2>
-  <input type="file" id="resultBgInput" accept="image/*">
-  <p>※ 設定されていない場合はデフォルト赤背景</p>
+  <div id="teams-container" style="margin-top:10px;"></div>
 
-  <h2>Webhook（複数登録 → 1つ選択）</h2>
-  <input id="webhookInput" placeholder="https://discord.com/api/webhooks/...">
-  <button onclick="addWebhook()">追加</button>
-  <div id="webhookList" style="margin-top:10px;"></div>
+  <h3>スコア</h3>
+  <table id="scoreTable" border="1">
+    <thead><tr><th>順位</th><th>チーム</th><th>スコア</th></tr></thead>
+    <tbody></tbody>
+  </table>
 
-  <h2>OBS Overlay</h2>
-  <button onclick="openOverlay()">overlay.html を開く</button>
+  <h3>タイムスタンプ</h3>
+  <input id="timestampInput" placeholder="例: 2026/6/3 21（空欄なら自動）" style="width:200px;">
 
-  <h2>リザルト画像</h2>
-  <div id="resultImageArea" style="display:none;">
-    <img id="resultImageLocal">
-    <br>
-    <button onclick="downloadResultImage()">画像を保存</button>
+  <!-- ペナルティ用モーダル -->
+  <div id="penaltyModal">
+    <h3>ペナルティ対象チームを選択</h3>
+    <div id="penaltyTeamButtons"></div>
+    <button onclick="closePenaltyModal()">閉じる</button>
   </div>
 
 </div>
 
-<!-- ▼ 履歴タブ -->
-<div id="historyTab" class="section" style="display:none;">
-  <h2>履歴</h2>
-  <div id="historyList"></div>
+<!-- 戦績タブ -->
+<div id="historyTab" class="tabContent" style="display:none;">
+  <h3>個人戦績（IndexedDB）</h3>
+  <div id="localHistory"></div>
 </div>
 
-<!-- ▼ JSON タブ -->
-<div id="jsonTab" class="section" style="display:none;">
-  <h2>JSON</h2>
-  <button onclick="exportJSON()">エクスポート</button>
-  <button onclick="importJSON()">インポート</button>
-  <textarea id="jsonArea" style="width:100%;height:300px;"></textarea>
+<!-- JSON タブ -->
+<div id="jsonTab" class="tabContent" style="display:none;">
+
+  <h3>JSON 操作</h3>
+  <button onclick="exportJSON()">JSON を表示</button>
+  <button onclick="downloadJSONFile()">JSON を保存</button>
+  <input type="file" id="jsonFileInput" accept="application/json" onchange="uploadJSONFile(this.files[0])">
+
+  <h4>特定チーム JSON</h4>
+  <input id="teamJsonInput" placeholder="チーム名">
+  <button onclick="downloadTeamJSONFile(document.getElementById('teamJsonInput').value)">保存</button>
+
+  <h4>JSON 読み込み（ドラッグ＆ドロップ）</h4>
+  <div id="jsonDropArea">ここに JSON ファイルをドロップ</div>
+
+  <textarea id="jsonArea" style="width:100%;height:200px;margin-top:10px;"></textarea>
+
 </div>
 
-<!-- ▼ P2P タブ -->
-<div id="p2pTab" class="section" style="display:none;">
-  <h2>P2P 同期</h2>
-  <button onclick="startP2P()">開始</button>
-  <div id="p2pStatus"></div>
+<!-- P2P タブ -->
+<div id="p2pTab" class="tabContent" style="display:none;">
+
+  <h3>P2P 共有</h3>
+  <button onclick="startP2PHost()">ホスト開始</button>
+  <button onclick="startP2PClient()">クライアント接続</button>
+
+  <div id="p2pStatus" style="margin-top:10px;"></div>
+
 </div>
+
+<!-- リザルトタブ -->
+<div id="resultTab" class="tabContent" style="display:none;">
+
+  <h3>リザルト画像</h3>
+  <button onclick="generateResultImage()">リザルト画像を生成</button>
+
+  <canvas id="resultCanvas" width="800" height="1200" style="display:none;"></canvas>
+
+</div>
+
+<hr>
+
+<h3>集計表示</h3>
+<div class="button-bar">
+  <button onclick="showRanking()">順位表</button>
+  <button onclick="showRoundScores()">ラウンド別スコア</button>
+  <button onclick="showTeamProgress()">チーム別推移</button>
+</div>
+
+<h3>即時集計送信</h3>
+<button onclick="sendInstantScore()">途中経過を送信</button>
+
+<div id="aggregateArea" style="margin-top:20px;"></div>
+
 
 <script src="main.js"></script>
+
 </body>
 </html>
+
