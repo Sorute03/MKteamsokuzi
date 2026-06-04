@@ -508,24 +508,21 @@ function resetRanks() {
 /* ===== GitHub 保存（current / history） ===== */
 async function saveCurrentToGitHub() {
   if (!state.teamId) return;
+
   const payload = {
     teamId: state.teamId,
     teamScores: calculateTeamScores(),
     teams: state.teams,
     timestamp: Date.now()
   };
-  try {
-    await saveToGitHub(`current/${state.teamId}.json`, payload);
-  } catch (e) {
-    console.log("current 保存失敗", e);
-  }
+
+  await saveViaGitHubActions(`current/${state.teamId}.json`, payload);
 }
 
+
 async function saveHistoryToGitHub() {
-  if (!state.teamId) {
-    alert("先にチームIDを登録してください");
-    return;
-  }
+  if (!state.teamId) return;
+
   const payload = {
     teamId: state.teamId,
     mode: state.mode,
@@ -536,9 +533,12 @@ async function saveHistoryToGitHub() {
     penalty: state.penalty,
     timestamp: Date.now()
   };
+
   const filename = `${state.teamId}/${payload.timestamp}.json`;
-  await saveToGitHub(`history/${filename}`, payload);
-  alert("この試合を GitHub に保存しました");
+
+  await saveViaGitHubActions(`history/${filename}`, payload);
+
+  alert("GitHub に戦績を保存しました");
 }
 
 /* ===== ローカル保存 ===== */
@@ -566,38 +566,35 @@ async function saveHistoryRecord() {
 
 /* ===== 共有戦績読み込み（GitHub） ===== */
 async function loadSharedHistory() {
-  if (!state.teamId) {
-    document.getElementById("sharedHistory").textContent =
-      "teamId を入力して登録してから開いてください。";
+  const repo = "Sorute03/MKteamsokuzi";
+  const url = `https://api.github.com/repos/${repo}/contents/history/${state.teamId}`;
+
+  const res = await fetch(url);
+  if (!res.ok) {
+    document.getElementById("sharedHistory").textContent = "共有戦績はまだありません";
     return;
   }
-  try {
-    const url = `https://api.github.com/repos/${GITHUB_REPO}/contents/history/${state.teamId}`;
-    const res = await fetch(url);
-    const container = document.getElementById("sharedHistory");
-    if (!res.ok) {
-      container.textContent = "共有戦績はまだありません。";
-      return;
-    }
-    const files = await res.json();
-    const results = [];
-    for (const f of files) {
-      const data = await loadFromGitHub(`history/${state.teamId}/${f.name}`);
-      if (data) results.push(data);
-    }
-    results.sort((a,b)=>b.timestamp - a.timestamp);
-    container.innerHTML = results.map(r => `
+
+  const files = await res.json();
+  const results = [];
+
+  for (const f of files) {
+    const data = await loadFromGitHub(`history/${state.teamId}/${f.name}`);
+    if (data) results.push(data);
+  }
+
+  results.sort((a,b)=>b.timestamp - a.timestamp);
+
+  document.getElementById("sharedHistory").innerHTML =
+    results.map(r => `
       <div class="record">
         <b>${new Date(r.timestamp).toLocaleString()}</b><br>
         モード: ${r.mode}<br>
         スコア: ${Object.entries(r.teamScores).map(([t,s])=>`${t}:${s}`).join(" / ")}
       </div>
     `).join("");
-  } catch (e) {
-    document.getElementById("sharedHistory").textContent =
-      "共有戦績の取得に失敗しました。";
-  }
 }
+
 
 /* ===== ローカル戦績読み込み ===== */
 async function loadLocalHistory() {
@@ -624,6 +621,30 @@ async function loadLocalHistory() {
   }
 }
 
+
+async function saveViaGitHubActions(path, jsonData) {
+  const content = btoa(JSON.stringify(jsonData, null, 2));
+
+  await fetch(
+    "https://api.github.com/repos/Sorute03/MKteamsokuzi/dispatches",
+    {
+      method: "POST",
+      headers: {
+        "Accept": "application/vnd.github+json",
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        event_type: "save",
+        client_payload: {
+          path: path,
+          content: content
+        }
+      })
+    }
+  );
+}
+
+
 /* ===== タブ切り替え ===== */
 document.querySelectorAll(".tabBtn").forEach(btn => {
   btn.onclick = () => {
@@ -643,6 +664,7 @@ document.querySelectorAll(".tabBtn").forEach(btn => {
     }
   };
 });
+  
 
 /* ===== 自動更新（共有戦績のみ） ===== */
 setInterval(() => {
