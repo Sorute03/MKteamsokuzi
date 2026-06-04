@@ -346,32 +346,51 @@ function createTeamInputs() {
   const container = document.getElementById("teams-container");
   container.innerHTML = "";
 
-  for (let round=0; round<totalRounds; round++) {
-    let html = `
-      <div class="team-section">
-        <h3>ラウンド${round+1}</h3>
+  for (let round = 0; round < totalRounds; round++) {
+
+    // ラウンド枠
+    const section = document.createElement("div");
+    section.className = "team-section";
+
+    // ヘッダー（ここに確定ボタンがある）
+    const header = document.createElement("div");
+    header.style.display = "flex";
+    header.style.justifyContent = "space-between";
+    header.style.alignItems = "center";
+
+    header.innerHTML = `
+      <h3>ラウンド${round + 1}</h3>
+      <button onclick="confirmRound(${round})">確定</button>
     `;
 
-    state.teams.forEach(team => {
-      html += `<div>${team}</div><div class="rank-buttons">`;
+    section.appendChild(header);
 
-      for (let rank=1; rank<=24; rank++) {
-        html += `
-          <div class="rank-button"
-               data-team="${team}"
-               data-round="${round}"
-               data-rank="${rank}"
-               onclick="toggleRank('${team}', ${round}, ${rank}, this)">
-            ${rank}
-          </div>
-        `;
+    // チームごとの順位ボタン
+    state.teams.forEach(team => {
+      const label = document.createElement("div");
+      label.textContent = team;
+      section.appendChild(label);
+
+      const row = document.createElement("div");
+      row.className = "rank-buttons";
+
+      for (let rank = 1; rank <= 24; rank++) {
+        const btn = document.createElement("div");
+        btn.className = "rank-button";
+        btn.textContent = rank;
+        btn.dataset.team = team;
+        btn.dataset.round = round;
+        btn.dataset.rank = rank;
+
+        btn.onclick = () => toggleRank(team, round, rank, btn);
+
+        row.appendChild(btn);
       }
 
-      html += `</div>`;
+      section.appendChild(row);
     });
 
-    html += `</div>`;
-    container.innerHTML += html;
+    container.appendChild(section);
   }
 }
 
