@@ -2,370 +2,262 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>MKteamsokuzi – GitHub Secrets 保存版</title>
+<title>MK Team Sokuzi</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
 <style>
-  body { font-family: system-ui, sans-serif; padding: 16px; }
-  input, select, button { margin: 4px; padding: 4px 8px; }
-  .section { border: 1px solid #ccc; padding: 8px; margin-bottom: 12px; }
-  .team-section { border: 1px solid #ddd; padding: 8px; margin: 8px 0; }
-  .rank-buttons { display: flex; flex-wrap: wrap; gap: 2px; margin-bottom: 8px; }
-  .rank-button {
-    width: 28px; height: 24px; font-size: 11px;
-    border: 1px solid #aaa; text-align: center; cursor: pointer;
-  }
-  .rank-button.selected {
-    background: #007bff; color: #fff; border-color: #0056b3;
-  }
-  table { border-collapse: collapse; margin-top: 8px; }
-  th, td { border: 1px solid #ccc; padding: 4px 8px; text-align: center; }
-  .tabs { display: flex; gap: 4px; margin-bottom: 8px; }
-  .tabBtn { padding: 4px 8px; cursor: pointer; border: 1px solid #ccc; background: #eee; }
-  .tabBtn.active { background: #ddd; font-weight: bold; }
-  .tabContent { display: none; }
-  .record { border: 1px solid #ccc; padding: 6px; margin: 4px 0; font-size: 13px; }
+body {
+  font-family: sans-serif;
+  margin: 20px;
+  background: #f5f5f5;
+}
+
+h2 {
+  margin-top: 30px;
+}
+
+.section {
+  background: white;
+  padding: 15px;
+  margin-bottom: 20px;
+  border-radius: 8px;
+  box-shadow: 0 0 4px rgba(0,0,0,0.1);
+}
+
+input, select, button {
+  padding: 6px 10px;
+  margin: 4px;
+  font-size: 14px;
+}
+
+button {
+  cursor: pointer;
+}
+
+.rank-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.rank-button {
+  width: 32px;
+  height: 32px;
+  background: #ddd;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.rank-button.selected {
+  background: #ff5555;
+  color: white;
+}
+
+.team-section {
+  margin-bottom: 20px;
+  padding: 10px;
+  background: #fafafa;
+  border-radius: 6px;
+  border: 1px solid #ddd;
+}
+
+.history-item {
+  padding: 10px;
+  margin: 6px 0;
+  background: #fff;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+}
 </style>
 </head>
+
 <body>
 
-<h1>MKteamsokuzi – GitHub Secrets 保存版</h1>
+<h1>MK Team Sokuzi</h1>
 
-<!-- ===========================
-     チーム設定
-=========================== -->
+<!-- ▼ Timestamp（3分割 UI） -->
+<div class="section">
+  <h2>試合日時</h2>
+  <label>年：</label>
+  <input id="tsYear" type="number" placeholder="2026" style="width:90px;">
+  <label>月：</label>
+  <input id="tsMonth" type="number" placeholder="6" style="width:60px;">
+  <label>日：</label>
+  <input id="tsDay" type="number" placeholder="3" style="width:60px;">
+  <label>時：</label>
+  <input id="tsHour" type="number" placeholder="21" style="width:60px;">
+</div>
+
+<!-- ▼ チーム設定 -->
 <div class="section">
   <h2>チーム設定</h2>
+  <label>自チーム名：</label>
+  <input id="teamIdInput" placeholder="例: Aチーム">
+  <button id="applyTeamId">設定</button>
 
-  <div>
-    <label>チームID：</label>
-    <input id="teamIdInput">
-    <button onclick="generateTeamId()">自動生成</button>
-    <button onclick="applyTeamId()">登録</button>
-  </div>
-
-  <div id="teamIdStatus"></div>
-
-  <div>
-    <label>自チーム名：</label>
-    <input id="myTeamInput">
-    <button onclick="saveMyTeamName()">保存</button>
-  </div>
-
-  <div>
-    <label>モード：</label>
-    <select id="modeSelect">
-      <option value="6v6">6v6</option>
-      <option value="4v4">4v4</option>
-      <option value="3v3">3v3</option>
-      <option value="2v2">2v2</option>
-    </select>
-
-    <label>チーム数：</label>
-    <select id="teamCountSelect">
-      <option value="2">2</option>
-      <option value="3">3</option>
-      <option value="4" selected>4</option>
-      <option value="6">6</option>
-      <option value="8">8</option>
-      <option value="12">12</option>
-    </select>
-
-    <button onclick="applyTeamNames()">反映</button>
-  </div>
-
-  <div id="enemyTeamEditor"></div>
+  <h3>チーム一覧</h3>
+  <input id="teamListInput" placeholder="例: A,B,C,D,E,F">
+  <button id="applyTeamList">反映</button>
 </div>
 
-<!-- ===========================
-     コース選択
-=========================== -->
+<!-- ▼ ラウンド入力 -->
 <div class="section">
-  <h2>コース選択</h2>
-  <div id="course-container"></div>
-</div>
-
-<!-- ===========================
-     順位入力
-=========================== -->
-<div class="section">
-  <h2>順位入力</h2>
+  <h2>ラウンド入力</h2>
   <div id="teams-container"></div>
 </div>
 
-<!-- ===========================
-     スコア
-=========================== -->
+<!-- ▼ 保存・読み込み -->
 <div class="section">
-  <h2>スコア</h2>
+  <h2>保存 / 読み込み</h2>
 
-  <table id="scoreTable">
-    <thead>
-      <tr><th>順位</th><th>チーム</th><th>スコア</th></tr>
-    </thead>
-    <tbody></tbody>
-  </table>
+  <button id="saveLocal">ローカル保存</button>
 
-  <button onclick="saveHistoryToGitHub()">試合を GitHub に保存</button>
+  <h3>JSON エクスポート / インポート（全戦績）</h3>
+  <button id="exportAllJson">全戦績エクスポート</button>
+  <input type="file" id="importAllJson">
+
+  <h3>P2P（全戦績同期）</h3>
+  <button id="p2pCreateOffer">接続コード生成（A）</button>
+  <textarea id="offerBox" style="width:100%;height:80px;"></textarea>
+
+  <button id="p2pAcceptOffer">接続コード貼って応答（B）</button>
+  <textarea id="answerBox" style="width:100%;height:80px;"></textarea>
+
+  <button id="p2pAcceptAnswer">応答コードを貼る（A）</button>
+
+  <button id="p2pSendAll">全戦績送信</button>
 </div>
 
-<!-- ===========================
-     戦績
-=========================== -->
+<!-- ▼ 履歴 -->
 <div class="section">
-  <h2>戦績</h2>
-
-  <div class="tabs">
-    <button class="tabBtn active" data-tab="historyTab">共有戦績</button>
-    <button class="tabBtn" data-tab="localTab">ローカル戦績</button>
-  </div>
-
-  <div id="historyTab" class="tabContent" style="display:block;">
-    <button onclick="loadSharedHistory()">読み込み</button>
-    <div id="sharedHistory"></div>
-  </div>
-
-  <div id="localTab" class="tabContent">
-    <button onclick="loadLocalHistory()">読み込み</button>
-    <div id="localHistory"></div>
-  </div>
+  <h2>戦績履歴</h2>
+  <div id="historyList"></div>
 </div>
 
 <script>
-/* ============================================================
-   設定
-============================================================ */
-const totalRounds = 12;
-const GITHUB_REPO = "Sorute03/MKteamsokuzi"; // 保存先リポジトリ
+  /* ============================================================
+   MK Team Sokuzi - main.js
+   Part 2: 全ロジック（IndexedDB / 重複チェック / JSON / P2P / UI生成）
+   ============================================================ */
 
-/* ============================================================
-   UTF-8 Base64（日本語対応）
-============================================================ */
-function encodeBase64(str) {
-  return btoa(unescape(encodeURIComponent(str)));
-}
-function decodeBase64(str) {
-  return decodeURIComponent(escape(atob(str)));
+/* ------------------------------------------------------------
+   IndexedDB 初期化
+------------------------------------------------------------ */
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open("mk_sokuzi_db", 1);
+
+    req.onupgradeneeded = e => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains("history")) {
+        db.createObjectStore("history", { keyPath: "id" });
+      }
+    };
+
+    req.onsuccess = e => resolve(e.target.result);
+    req.onerror = e => reject(e);
+  });
 }
 
-/* ============================================================
-   状態
-============================================================ */
-const state = {
+/* ------------------------------------------------------------
+   Timestamp（3分割 UI → timestamp）
+------------------------------------------------------------ */
+function getUserTimestamp() {
+  const y = document.getElementById("tsYear").value.trim();
+  const m = document.getElementById("tsMonth").value.trim();
+  const d = document.getElementById("tsDay").value.trim();
+  const h = document.getElementById("tsHour").value.trim();
+
+  // 未入力 → 自動生成
+  if (!y || !m || !d || !h) {
+    return Date.now();
+  }
+
+  const year = Number(y);
+  const month = Number(m);
+  const day = Number(d);
+  const hour = Number(h);
+
+  if (year < 2000 || year > 2100) return Date.now();
+  if (month < 1 || month > 12) return Date.now();
+  if (day < 1 || day > 31) return Date.now();
+  if (hour < 0 || hour > 23) return Date.now();
+
+  const date = new Date(year, month - 1, day, hour, 0, 0);
+  return date.getTime();
+}
+
+/* ------------------------------------------------------------
+   重複チェック（timestamp + 自チーム名 / 内容完全一致）
+------------------------------------------------------------ */
+function buildHistoryKey(record) {
+  return JSON.stringify({
+    teamId: record.teamId,
+    teams: record.teams,
+    courseNames: record.courseNames,
+    teamRanks: record.teamRanks,
+    penalty: record.penalty,
+    mode: record.mode
+  });
+}
+
+function isDuplicateRecord(newRecord, existingRecords) {
+  // ① timestamp + 自チーム名
+  if (existingRecords.some(r =>
+    r.timestamp === newRecord.timestamp &&
+    r.teams[0] === newRecord.teams[0]
+  )) {
+    return true;
+  }
+
+  // ② 内容完全一致
+  const newKey = buildHistoryKey(newRecord);
+  const existingKeys = new Set(existingRecords.map(r => buildHistoryKey(r)));
+
+  return existingKeys.has(newKey);
+}
+
+/* ------------------------------------------------------------
+   ラウンド UI 生成
+------------------------------------------------------------ */
+let state = {
   teamId: "",
-  mode: "6v6",
-  teams: ["チーム1","チーム2","チーム3","チーム4"],
-  myTeam: "チーム1",
-  enemyTeams: ["チーム2","チーム3","チーム4"],
-  courseList: [
-    "コースA","コースB","コースC","コースD"
-  ],
-  teamSizeMap: {},
-  teamRanks: {},
-  courseNames: Array(totalRounds).fill(""),
-  penalty: {}
+  teams: [],
+  teamRanks: [],
+  courseNames: [],
+  penalty: 0,
+  mode: "12R"
 };
 
-/* ============================================================
-   GitHub Actions 経由で保存（Secrets 使用）
-============================================================ */
-async function saveViaGitHubActions(path, jsonData) {
-  const content = encodeBase64(JSON.stringify(jsonData, null, 2));
-
-  const res = await fetch(
-    `https://api.github.com/repos/${GITHUB_REPO}/dispatches`,
-    {
-      method: "POST",
-      headers: {
-        "Accept": "application/vnd.github+json",
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        event_type: "save",
-        client_payload: {
-          path: path,
-          content: content
-        }
-      })
-    }
-  );
-
-  if (!res.ok) {
-    console.error(await res.text());
-    throw new Error("GitHub Actions 呼び出し失敗");
-  }
-}
-
-/* ============================================================
-   GitHub API GET（読み込み）
-============================================================ */
-async function loadFromGitHub(path) {
-  const url = `https://api.github.com/repos/${GITHUB_REPO}/contents/${path}`;
-  const res = await fetch(url);
-
-  if (res.status === 404) return null;
-
-  const data = await res.json();
-  return JSON.parse(decodeBase64(data.content));
-}
-
-/* ============================================================
-   チームID
-============================================================ */
-function generateTeamId() {
-  const id = Math.random().toString(36).substring(2, 8).toUpperCase();
-  document.getElementById("teamIdInput").value = id;
-  applyTeamId();
-}
-
-async function applyTeamId() {
-  const id = document.getElementById("teamIdInput").value.trim();
-  if (!id) return alert("チームIDを入力してください");
-
-  state.teamId = id;
-  document.getElementById("teamIdStatus").textContent =
-    `チームID「${id}」を使用中`;
-
-  const data = await loadFromGitHub(`teamName/${id}.json`);
-  if (data && data.myTeamName) {
-    state.myTeam = data.myTeamName;
-    document.getElementById("myTeamInput").value = data.myTeamName;
-  }
-
-  alert("チームIDを登録しました");
-}
-
-/* ============================================================
-   自チーム名保存（GitHub Secrets）
-============================================================ */
-async function saveMyTeamName() {
-  if (!state.teamId) return alert("先にチームIDを登録してください");
-
-  const name = document.getElementById("myTeamInput").value.trim();
-  if (!name) return;
-
-  await saveViaGitHubActions(
-    `teamName/${state.teamId}.json`,
-    { myTeamName: name }
-  );
-
-  alert("自チーム名を保存しました");
-}
-
-/* ============================================================
-   フォーマット・UI
-============================================================ */
-function setFormatFromMode(modeStr) {
-  state.mode = modeStr;
-
-  const size = parseInt(modeStr.split("v")[0]);
-  const totalPlayers = 24;
-  const teamCount = totalPlayers / size;
-
-  document.getElementById("teamCountSelect").value = String(teamCount);
-
-  const names = [];
-  names.push(state.myTeam);
-  for (let i = 1; i < teamCount; i++) {
-    names.push(state.enemyTeams[i-1] || `チーム${i+1}`);
-  }
-
-  state.teams = names;
-  state.enemyTeams = names.slice(1);
-
-  state.teamSizeMap = {};
-  state.teams.forEach(t => state.teamSizeMap[t] = size);
-
-  state.teamRanks = {};
-  state.teams.forEach(t => {
-    state.teamRanks[t] = {};
-    for (let r=0; r<totalRounds; r++) state.teamRanks[t][r] = [];
-  });
-
-  createEnemyTeamEditor();
-  createCourseSelectors();
-  createTeamInputs();
-  updateScores();
-}
-
-function createEnemyTeamEditor() {
-  const count = parseInt(document.getElementById("teamCountSelect").value);
-  const container = document.getElementById("enemyTeamEditor");
-  container.innerHTML = "";
-
-  for (let i = 1; i < count; i++) {
-    const name = state.enemyTeams[i-1] || `チーム${i+1}`;
-    container.innerHTML += `
-      <div>
-        <label>敵チーム${i}：</label>
-        <input id="enemyTeamInput-${i}" value="${name}">
-      </div>
-    `;
-  }
-}
-
-function applyTeamNames() {
-  const count = parseInt(document.getElementById("teamCountSelect").value);
-
-  state.myTeam = document.getElementById("myTeamInput").value.trim() || "自チーム";
-
-  const enemy = [];
-  for (let i = 1; i < count; i++) {
-    enemy.push(
-      document.getElementById(`enemyTeamInput-${i}`).value.trim() || `敵チーム${i}`
-    );
-  }
-
-  state.enemyTeams = enemy;
-  state.teams = [state.myTeam, ...enemy];
-
-  setFormatFromMode(state.mode);
-}
-
-/* ============================================================
-   コース選択
-============================================================ */
-function createCourseSelectors() {
-  const container = document.getElementById("course-container");
-  container.innerHTML = "";
-
-  for (let i=0; i<totalRounds; i++) {
-    container.innerHTML += `
-      <div>
-        <label>ラウンド${i+1}：</label>
-        <select id="course-select-${i}">
-          ${state.courseList.map(c => `<option>${c}</option>`).join("")}
-        </select>
-      </div>
-    `;
-  }
-}
-
-/* ============================================================
-   順位入力
-============================================================ */
 function createTeamInputs() {
   const container = document.getElementById("teams-container");
   container.innerHTML = "";
 
-  for (let round = 0; round < totalRounds; round++) {
+  const totalRounds = 12;
 
-    // ラウンド枠
+  for (let round = 0; round < totalRounds; round++) {
     const section = document.createElement("div");
     section.className = "team-section";
 
-    // ヘッダー（ここに確定ボタンがある）
     const header = document.createElement("div");
     header.style.display = "flex";
     header.style.justifyContent = "space-between";
-    header.style.alignItems = "center";
 
-    header.innerHTML = `
-      <h3>ラウンド${round + 1}</h3>
-      <button onclick="confirmRound(${round})">確定</button>
-    `;
+    const title = document.createElement("h3");
+    title.textContent = `ラウンド ${round + 1}`;
 
+    const confirmBtn = document.createElement("button");
+    confirmBtn.textContent = "確定";
+    confirmBtn.onclick = () => confirmRound(round);
+
+    header.appendChild(title);
+    header.appendChild(confirmBtn);
     section.appendChild(header);
 
-    // チームごとの順位ボタン
     state.teams.forEach(team => {
       const label = document.createElement("div");
       label.textContent = team;
@@ -378,6 +270,7 @@ function createTeamInputs() {
         const btn = document.createElement("div");
         btn.className = "rank-button";
         btn.textContent = rank;
+
         btn.dataset.team = team;
         btn.dataset.round = round;
         btn.dataset.rank = rank;
@@ -394,93 +287,36 @@ function createTeamInputs() {
   }
 }
 
+/* ------------------------------------------------------------
+   ランク選択
+------------------------------------------------------------ */
 function toggleRank(team, round, rank, btn) {
-  const arr = state.teamRanks[team][round];
-  const idx = arr.indexOf(rank);
+  if (!state.teamRanks[round]) state.teamRanks[round] = {};
+  state.teamRanks[round][team] = rank;
 
-  if (idx >= 0) {
-    arr.splice(idx,1);
-    btn.classList.remove("selected");
-  } else {
-    if (arr.length < state.teamSizeMap[team]) {
-      arr.push(rank);
-      btn.classList.add("selected");
-    } else {
-      alert(`${team} は最大 ${state.teamSizeMap[team]} 人です`);
-    }
-  }
-
-  updateScores();
+  const buttons = btn.parentNode.querySelectorAll(".rank-button");
+  buttons.forEach(b => b.classList.remove("selected"));
+  btn.classList.add("selected");
 }
 
-/* ============================================================
-   スコア計算
-============================================================ */
-function getPointsByRank(rank) {
-  if (rank===1) return 15;
-  if (rank===2) return 12;
-  if (rank===3) return 10;
-  if (rank===4||rank===5) return 9;
-  if (rank===6||rank===7) return 8;
-  if (rank===8||rank===9) return 7;
-  if (rank>=10 && rank<=12) return 6;
-  if (rank>=13 && rank<=15) return 5;
-  if (rank>=16 && rank<=18) return 4;
-  if (rank>=19 && rank<=21) return 3;
-  if (rank===22||rank===23) return 2;
-  if (rank===24) return 1;
-  return 0;
+function confirmRound(round) {
+  alert(`ラウンド ${round + 1} を確定しました`);
 }
 
+/* ------------------------------------------------------------
+   スコア計算（必要なら後で拡張）
+------------------------------------------------------------ */
 function calculateTeamScores() {
-  const result = {};
-  state.teams.forEach(team => {
-    let score = 0;
-    for (let r=0; r<totalRounds; r++) {
-      state.teamRanks[team][r].forEach(rank => {
-        score += getPointsByRank(rank);
-      });
-    }
-    score += (state.penalty[team] || 0);
-    result[team] = score;
-  });
-  return result;
+  return {}; // 必要なら後で実装
 }
 
-function updateScores() {
-  const scores = calculateTeamScores();
-  const results = Object.entries(scores).sort((a,b)=>b[1]-a[1]);
+/* ------------------------------------------------------------
+   ローカル保存（1 試合）
+------------------------------------------------------------ */
+async function saveHistoryToLocal() {
+  const timestamp = getUserTimestamp();
 
-  const tbody = document.querySelector("#scoreTable tbody");
-  tbody.innerHTML = "";
-
-  results.forEach(([team,score],i)=>{
-    tbody.innerHTML += `<tr><td>${i+1}</td><td>${team}</td><td>${score}</td></tr>`;
-  });
-
-  saveCurrentToGitHub();
-}
-
-/* ============================================================
-   GitHub 保存（current / history）
-============================================================ */
-async function saveCurrentToGitHub() {
-  if (!state.teamId) return;
-
-  const payload = {
-    teamId: state.teamId,
-    teamScores: calculateTeamScores(),
-    teams: state.teams,
-    timestamp: Date.now()
-  };
-
-  await saveViaGitHubActions(`current/${state.teamId}.json`, payload);
-}
-
-async function saveHistoryToGitHub() {
-  if (!state.teamId) return alert("先にチームIDを登録してください");
-
-  const payload = {
+  const record = {
     teamId: state.teamId,
     mode: state.mode,
     teams: state.teams,
@@ -488,128 +324,189 @@ async function saveHistoryToGitHub() {
     teamScores: calculateTeamScores(),
     courseNames: state.courseNames,
     penalty: state.penalty,
-    timestamp: Date.now()
+    timestamp: timestamp
   };
 
-  const filename = `${state.teamId}/${payload.timestamp}.json`;
+  const db = await openDB();
+  const tx = db.transaction("history", "readwrite");
+  const store = tx.objectStore("history");
 
-  await saveViaGitHubActions(`history/${filename}`, payload);
+  const all = await store.getAll();
 
-  alert("GitHub に保存しました");
-}
-
-/* ============================================================
-   共有戦績読み込み
-============================================================ */
-async function loadSharedHistory() {
-  if (!state.teamId) return;
-
-  const url = `https://api.github.com/repos/${GITHUB_REPO}/contents/history/${state.teamId}`;
-  const res = await fetch(url);
-
-  const container = document.getElementById("sharedHistory");
-
-  if (res.status === 404) {
-    container.textContent = "共有戦績はまだありません";
+  if (isDuplicateRecord(record, all)) {
+    alert("この戦績はすでに存在します（重複スキップ）");
     return;
   }
 
-  const files = await res.json();
-  const results = [];
+  store.put({ id: timestamp, ...record });
+  await tx.complete;
 
-  for (const f of files) {
-    const data = await loadFromGitHub(`history/${state.teamId}/${f.name}`);
-    if (data) results.push(data);
-  }
-
-  results.sort((a,b)=>b.timestamp - a.timestamp);
-
-  container.innerHTML = results.map(r => `
-    <div class="record">
-      <b>${new Date(r.timestamp).toLocaleString()}</b><br>
-      モード: ${r.mode}<br>
-      スコア: ${Object.entries(r.teamScores).map(([t,s])=>`${t}:${s}`).join(" / ")}
-    </div>
-  `).join("");
+  alert("戦績を保存しました");
+  loadHistoryList();
 }
 
-/* ============================================================
-   ローカル戦績（IndexedDB）
-============================================================ */
-async function loadLocalHistory() {
-  try {
-    const db = await openDB();
-    const tx = db.transaction("history","readonly");
-    const store = tx.objectStore("history");
-    const all = await store.getAll();
+/* ------------------------------------------------------------
+   JSON 全戦績エクスポート
+------------------------------------------------------------ */
+async function exportAllHistoryJSON() {
+  const db = await openDB();
+  const tx = db.transaction("history", "readonly");
+  const store = tx.objectStore("history");
+  const all = await store.getAll();
 
-    const container = document.getElementById("localHistory");
+  const blob = new Blob([JSON.stringify(all, null, 2)], {
+    type: "application/json"
+  });
 
-    if (!all.length) {
-      container.textContent = "ローカル戦績はまだありません。";
-      return;
-    }
-
-    container.innerHTML = all
-      .sort((a,b)=>b.timestamp - a.timestamp)
-      .map(r => `
-        <div class="record">
-          <b>${new Date(r.timestamp).toLocaleString()}</b><br>
-          モード: ${r.mode}<br>
-          スコア: ${Object.entries(r.teamScores)
-            .map(([t,s])=>`${t}:${s}`).join(" / ")}
-        </div>
-      `).join("");
-
-  } catch (e) {
-    document.getElementById("localHistory").textContent =
-      "ローカル戦績の取得に失敗しました。";
-  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `mk_history_all_${Date.now()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
-/* ============================================================
-   タブ切り替え
-============================================================ */
-document.querySelectorAll(".tabBtn").forEach(btn => {
-  btn.onclick = () => {
-    const target = btn.dataset.tab;
+/* ------------------------------------------------------------
+   JSON 全戦績インポート
+------------------------------------------------------------ */
+async function importAllHistoryJSON(file) {
+  const text = await file.text();
+  const list = JSON.parse(text);
 
-    document.querySelectorAll(".tabContent").forEach(tab => {
-      tab.style.display = "none";
-    });
+  const db = await openDB();
+  const tx = db.transaction("history", "readwrite");
+  const store = tx.objectStore("history");
 
-    document.querySelectorAll(".tabBtn").forEach(b => {
-      b.classList.remove("active");
-    });
+  const existing = await store.getAll();
 
-    document.getElementById(target).style.display = "block";
-    btn.classList.add("active");
-
-    if (target === "historyTab") {
-      loadSharedHistory();
+  let added = 0;
+  for (const record of list) {
+    if (!isDuplicateRecord(record, existing)) {
+      store.put({ id: record.timestamp, ...record });
+      existing.push(record);
+      added++;
     }
-    if (target === "localTab") {
-      loadLocalHistory();
-    }
+  }
+
+  await tx.complete;
+
+  alert(`全戦績インポート完了：${added} 件追加`);
+  loadHistoryList();
+}
+
+/* ------------------------------------------------------------
+   P2P（全戦績同期）
+------------------------------------------------------------ */
+let peerConnection;
+let dataChannel;
+
+async function p2pCreateOffer() {
+  peerConnection = new RTCPeerConnection();
+  dataChannel = peerConnection.createDataChannel("mkdata");
+
+  dataChannel.onopen = () => alert("P2P 接続完了");
+  dataChannel.onmessage = e => receiveP2PData(e.data);
+
+  const offer = await peerConnection.createOffer();
+  await peerConnection.setLocalDescription(offer);
+
+  document.getElementById("offerBox").value =
+    btoa(JSON.stringify(offer));
+}
+
+async function p2pAcceptOffer() {
+  const offer = JSON.parse(atob(document.getElementById("offerBox").value));
+
+  peerConnection = new RTCPeerConnection();
+
+  peerConnection.ondatachannel = e => {
+    dataChannel = e.channel;
+    dataChannel.onopen = () => alert("P2P 接続完了");
+    dataChannel.onmessage = e => receiveP2PData(e.data);
   };
-});
 
-/* ============================================================
-   初期化
-============================================================ */
-document.getElementById("modeSelect").onchange = e => {
-  setFormatFromMode(e.target.value);
-};
+  await peerConnection.setRemoteDescription(offer);
 
-document.getElementById("teamCountSelect").onchange = () => {
-  createEnemyTeamEditor();
-};
+  const answer = await peerConnection.createAnswer();
+  await peerConnection.setLocalDescription(answer);
 
-setFormatFromMode("6v6");
-createEnemyTeamEditor();
-createCourseSelectors();
-createTeamInputs();
-updateScores();
+  document.getElementById("answerBox").value =
+    btoa(JSON.stringify(answer));
+}
+
+async function p2pAcceptAnswer() {
+  const answer = JSON.parse(atob(document.getElementById("answerBox").value));
+  await peerConnection.setRemoteDescription(answer);
+}
+
+async function p2pSendAll() {
+  const db = await openDB();
+  const tx = db.transaction("history", "readonly");
+  const store = tx.objectStore("history");
+  const all = await store.getAll();
+
+  const ts = getUserTimestamp();
+  const updated = all.map(r => ({ ...r, timestamp: ts }));
+
+  dataChannel.send(JSON.stringify({
+    type: "allHistory",
+    data: updated
+  }));
+
+  alert("全戦績データを送信しました");
+}
+
+function receiveP2PData(text) {
+  const packet = JSON.parse(text);
+
+  if (packet.type === "allHistory") {
+    mergeAllHistory(packet.data);
+  }
+}
+
+async function mergeAllHistory(list) {
+  const db = await openDB();
+  const tx = db.transaction("history", "readwrite");
+  const store = tx.objectStore("history");
+
+  const existing = await store.getAll();
+
+  let added = 0;
+  for (const record of list) {
+    if (!isDuplicateRecord(record, existing)) {
+      store.put({ id: record.timestamp, ...record });
+      existing.push(record);
+      added++;
+    }
+  }
+
+  await tx.complete;
+
+  alert(`P2P で全戦績受信：${added} 件追加`);
+  loadHistoryList();
+}
+
+/* ------------------------------------------------------------
+   履歴表示
+------------------------------------------------------------ */
+async function loadHistoryList() {
+  const db = await openDB();
+  const tx = db.transaction("history", "readonly");
+  const store = tx.objectStore("history");
+  const all = await store.getAll();
+
+  const list = document.getElementById("historyList");
+  list.innerHTML = "";
+
+  all.sort((a, b) => b.timestamp - a.timestamp);
+
+  all.forEach(r => {
+    const div = document.createElement("div");
+    div.className = "history-item";
+    div.textContent = `${r.teams[0]} / ${new Date(r.timestamp).toLocaleString()}`;
+    list.appendChild(div);
+  });
+}
 
 </script>
 </body>
