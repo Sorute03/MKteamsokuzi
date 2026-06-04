@@ -2,18 +2,38 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>MK Team Sokuzi</title>
+<title>MK Sokuzi 完全版</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
 body {
   font-family: sans-serif;
-  margin: 20px;
+  margin: 0;
+  padding: 0;
   background: #f5f5f5;
 }
 
-h2 {
-  margin-top: 30px;
+#tabs {
+  display: flex;
+  background: #222;
+}
+
+.tabBtn {
+  flex: 1;
+  padding: 12px;
+  color: white;
+  background: #333;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.tabBtn.active {
+  background: #555;
+}
+
+.tabContent {
+  padding: 20px;
 }
 
 .section {
@@ -72,77 +92,172 @@ button {
   border-radius: 6px;
   border: 1px solid #ccc;
 }
+
+#penaltyModal {
+  display:none;
+  position:fixed;
+  top:20%;
+  left:50%;
+  transform:translateX(-50%);
+  background:white;
+  padding:20px;
+  border-radius:10px;
+  box-shadow:0 0 10px rgba(0,0,0,0.3);
+}
 </style>
 </head>
 
 <body>
 
-<h1>MK Team Sokuzi</h1>
-
-<!-- ▼ Timestamp（3分割 UI） -->
-<div class="section">
-  <h2>試合日時</h2>
-  <label>年：</label>
-  <input id="tsYear" type="number" placeholder="2026" style="width:90px;">
-  <label>月：</label>
-  <input id="tsMonth" type="number" placeholder="6" style="width:60px;">
-  <label>日：</label>
-  <input id="tsDay" type="number" placeholder="3" style="width:60px;">
-  <label>時：</label>
-  <input id="tsHour" type="number" placeholder="21" style="width:60px;">
+<!-- ▼ タブ -->
+<div id="tabs">
+  <button class="tabBtn active" data-tab="inputTab">入力</button>
+  <button class="tabBtn" data-tab="historyTab">戦績</button>
 </div>
 
-<!-- ▼ チーム設定 -->
-<div class="section">
-  <h2>チーム設定</h2>
-  <label>自チーム名：</label>
-  <input id="teamIdInput" placeholder="例: Aチーム">
-  <button id="applyTeamId">設定</button>
+<!-- ▼ 入力タブ -->
+<div id="inputTab" class="tabContent" style="display:block;">
 
-  <h3>チーム一覧</h3>
-  <input id="teamListInput" placeholder="例: A,B,C,D,E,F">
-  <button id="applyTeamList">反映</button>
+  <!-- ▼ Timestamp（3分割） -->
+  <h3>試合日時</h3>
+  <div>
+    <label>年：</label>
+    <input id="tsYear" type="number" placeholder="2026" style="width:90px;">
+    <label>月：</label>
+    <input id="tsMonth" type="number" placeholder="6" style="width:60px;">
+    <label>日：</label>
+    <input id="tsDay" type="number" placeholder="3" style="width:60px;">
+    <label>時：</label>
+    <input id="tsHour" type="number" placeholder="21" style="width:60px;">
+  </div>
+
+  <hr>
+
+  <!-- ▼ チームID -->
+  <h3>チームID登録</h3>
+  <div>
+    <label>チームID：</label>
+    <input id="teamIdInput" placeholder="例：ABC123">
+    <button onclick="applyTeamId()">登録</button>
+    <button onclick="generateTeamId()">新規作成</button>
+  </div>
+  <div id="teamIdStatus" style="margin-top:5px; color:green;"></div>
+
+  <hr>
+
+  <!-- ▼ モード -->
+  <h3>モード設定</h3>
+  <div>
+    <label>モード：</label>
+    <select id="modeSelect">
+      <option value="3v3">3v3</option>
+      <option value="4v4">4v4</option>
+      <option value="6v6" selected>6v6</option>
+      <option value="8v8">8v8</option>
+      <option value="12v12">12v12</option>
+    </select>
+  </div>
+
+  <!-- ▼ チーム設定 -->
+  <h3>チーム設定</h3>
+  <div>
+    <label>チーム数：</label>
+    <select id="teamCountSelect">
+      <option value="2">2チーム</option>
+      <option value="3">3チーム</option>
+      <option value="4" selected>4チーム</option>
+      <option value="5">5チーム</option>
+      <option value="6">6チーム</option>
+    </select>
+  </div>
+  <br>
+  <div>
+    <label>自チーム：</label>
+    <input id="myTeamInput" value="チーム1">
+  </div>
+  <br>
+  <div id="enemyTeamEditor"></div>
+  <button onclick="applyTeamNames(); saveMyTeamName();">チーム名を適用</button>
+
+  <hr>
+
+  <!-- ▼ コース -->
+  <h3>コース選択</h3>
+  <div id="course-container"></div>
+
+  <div class="button-bar" style="margin-top:10px;">
+    <button onclick="resetRanks()">リセット</button>
+    <button onclick="openPenaltyTeamSelect()">ペナルティ</button>
+    <button onclick="saveHistoryRecord()">この試合をローカル保存</button>
+
+    <!-- ▼ OBS overlay（GAS） -->
+    <button onclick="sendOverlayToGAS()">OBS に途中結果送信</button>
+    <button onclick="resetOverlayOnGAS()">OBS オーバーレイをリセット</button>
+
+    <!-- ▼ 12R終了で自動画像生成（テスト用） -->
+    <button onclick="forceFinishSet()">12R 終了扱い（テスト）</button>
+  </div>
+
+  <div id="teams-container" style="margin-top:10px;"></div>
+
+  <h3>スコア</h3>
+  <table id="scoreTable" border="1">
+    <thead><tr><th>順位</th><th>チーム</th><th>スコア</th></tr></thead>
+    <tbody></tbody>
+  </table>
+
+  <!-- ペナルティ用モーダル -->
+  <div id="penaltyModal">
+    <h3>ペナルティ対象チームを選択</h3>
+    <div id="penaltyTeamButtons"></div>
+    <button onclick="closePenaltyModal()">閉じる</button>
+  </div>
+
 </div>
 
-<!-- ▼ ラウンド入力 -->
-<div class="section">
-  <h2>ラウンド入力</h2>
-  <div id="teams-container"></div>
-</div>
+<!-- ▼ 戦績タブ -->
+<div id="historyTab" class="tabContent" style="display:none;">
+  <h3>個人戦績（IndexedDB）</h3>
+  <div id="localHistory"></div>
 
-<!-- ▼ 保存・読み込み -->
-<div class="section">
-  <h2>保存 / 読み込み</h2>
-
-  <button id="saveLocal">ローカル保存</button>
-
-  <h3>JSON エクスポート / インポート（全戦績）</h3>
-  <button id="exportAllJson">全戦績エクスポート</button>
+  <h3>JSON 全戦績</h3>
+  <button onclick="exportAllHistoryJSON()">エクスポート</button>
   <input type="file" id="importAllJson">
 
-  <h3>P2P（全戦績同期）</h3>
-  <button id="p2pCreateOffer">接続コード生成（A）</button>
+  <h3>P2P 全戦績同期</h3>
+  <button onclick="p2pCreateOffer()">接続コード生成（A）</button>
   <textarea id="offerBox" style="width:100%;height:80px;"></textarea>
 
-  <button id="p2pAcceptOffer">接続コード貼って応答（B）</button>
+  <button onclick="p2pAcceptOffer()">接続コード貼って応答（B）</button>
   <textarea id="answerBox" style="width:100%;height:80px;"></textarea>
 
-  <button id="p2pAcceptAnswer">応答コードを貼る（A）</button>
+  <button onclick="p2pAcceptAnswer()">応答コードを貼る（A）</button>
 
-  <button id="p2pSendAll">全戦績送信</button>
-</div>
-
-<!-- ▼ 履歴 -->
-<div class="section">
-  <h2>戦績履歴</h2>
-  <div id="historyList"></div>
+  <button onclick="p2pSendAll()">全戦績送信</button>
 </div>
 
 <script>
-  /* ============================================================
-   MK Team Sokuzi - main.js
-   Part 2: 全ロジック（IndexedDB / 重複チェック / JSON / P2P / UI生成）
+/* ============================================================
+   MK Sokuzi 完全版 main.js
    ============================================================ */
+
+/* ------------------------------------------------------------
+   ★ 設定：GAS URL（あなたのデプロイURLを入れる）
+------------------------------------------------------------ */
+const GAS_URL = "YOUR_GAS_URL_HERE";
+
+/* ------------------------------------------------------------
+   タブ切り替え
+------------------------------------------------------------ */
+document.querySelectorAll(".tabBtn").forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll(".tabBtn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+
+    document.querySelectorAll(".tabContent").forEach(tab => tab.style.display = "none");
+    document.getElementById(btn.dataset.tab).style.display = "block";
+  };
+});
 
 /* ------------------------------------------------------------
    IndexedDB 初期化
@@ -172,74 +287,112 @@ function getUserTimestamp() {
   const d = document.getElementById("tsDay").value.trim();
   const h = document.getElementById("tsHour").value.trim();
 
-  // 未入力 → 自動生成
-  if (!y || !m || !d || !h) {
-    return Date.now();
-  }
+  if (!y || !m || !d || !h) return Date.now();
 
-  const year = Number(y);
-  const month = Number(m);
-  const day = Number(d);
-  const hour = Number(h);
-
-  if (year < 2000 || year > 2100) return Date.now();
-  if (month < 1 || month > 12) return Date.now();
-  if (day < 1 || day > 31) return Date.now();
-  if (hour < 0 || hour > 23) return Date.now();
-
-  const date = new Date(year, month - 1, day, hour, 0, 0);
+  const date = new Date(Number(y), Number(m) - 1, Number(d), Number(h), 0, 0);
   return date.getTime();
 }
 
 /* ------------------------------------------------------------
-   重複チェック（timestamp + 自チーム名 / 内容完全一致）
------------------------------------------------------------- */
-function buildHistoryKey(record) {
-  return JSON.stringify({
-    teamId: record.teamId,
-    teams: record.teams,
-    courseNames: record.courseNames,
-    teamRanks: record.teamRanks,
-    penalty: record.penalty,
-    mode: record.mode
-  });
-}
-
-function isDuplicateRecord(newRecord, existingRecords) {
-  // ① timestamp + 自チーム名
-  if (existingRecords.some(r =>
-    r.timestamp === newRecord.timestamp &&
-    r.teams[0] === newRecord.teams[0]
-  )) {
-    return true;
-  }
-
-  // ② 内容完全一致
-  const newKey = buildHistoryKey(newRecord);
-  const existingKeys = new Set(existingRecords.map(r => buildHistoryKey(r)));
-
-  return existingKeys.has(newKey);
-}
-
-/* ------------------------------------------------------------
-   ラウンド UI 生成
+   状態管理
 ------------------------------------------------------------ */
 let state = {
   teamId: "",
+  mode: "6v6",
+  teamCount: 4,
   teams: [],
   teamRanks: [],
   courseNames: [],
-  penalty: 0,
-  mode: "12R"
+  penalty: 0
 };
 
+/* ------------------------------------------------------------
+   チームID
+------------------------------------------------------------ */
+function applyTeamId() {
+  const id = document.getElementById("teamIdInput").value.trim();
+  if (!id) return alert("チームIDを入力してください");
+  state.teamId = id;
+  document.getElementById("teamIdStatus").textContent = "登録しました";
+}
+
+function generateTeamId() {
+  const id = Math.random().toString(36).substring(2, 10);
+  document.getElementById("teamIdInput").value = id;
+  applyTeamId();
+}
+
+/* ------------------------------------------------------------
+   チーム名設定
+------------------------------------------------------------ */
+function applyTeamNames() {
+  const count = Number(document.getElementById("teamCountSelect").value);
+  const myTeam = document.getElementById("myTeamInput").value.trim();
+
+  state.teamCount = count;
+  state.teams = [myTeam];
+
+  const enemies = [];
+  for (let i = 1; i < count; i++) {
+    const v = document.getElementById(`enemyTeam${i}`).value.trim();
+    enemies.push(v || `チーム${i + 1}`);
+  }
+  state.teams.push(...enemies);
+
+  createTeamInputs();
+}
+
+function saveMyTeamName() {
+  localStorage.setItem("myTeamName", document.getElementById("myTeamInput").value);
+}
+
+/* ------------------------------------------------------------
+   敵チーム名エディタ生成
+------------------------------------------------------------ */
+function buildEnemyTeamEditor() {
+  const count = Number(document.getElementById("teamCountSelect").value);
+  const editor = document.getElementById("enemyTeamEditor");
+  editor.innerHTML = "";
+
+  for (let i = 1; i < count; i++) {
+    const div = document.createElement("div");
+    div.innerHTML = `
+      <label>敵チーム${i + 1}：</label>
+      <input id="enemyTeam${i}" value="チーム${i + 1}">
+    `;
+    editor.appendChild(div);
+  }
+}
+
+document.getElementById("teamCountSelect").onchange = buildEnemyTeamEditor;
+buildEnemyTeamEditor();
+
+/* ------------------------------------------------------------
+   コース選択（簡易）
+------------------------------------------------------------ */
+function buildCourseSelector() {
+  const container = document.getElementById("course-container");
+  container.innerHTML = "";
+
+  for (let i = 0; i < 12; i++) {
+    const div = document.createElement("div");
+    div.innerHTML = `
+      <label>${i + 1}R：</label>
+      <input id="course${i}" placeholder="コース名">
+    `;
+    container.appendChild(div);
+  }
+}
+buildCourseSelector();
+
+/* ------------------------------------------------------------
+   ラウンド入力 UI
+------------------------------------------------------------ */
 function createTeamInputs() {
   const container = document.getElementById("teams-container");
   container.innerHTML = "";
 
-  const totalRounds = 12;
-
-  for (let round = 0; round < totalRounds; round++) {
+  for (let round = 0; round < 12; round++) {
     const section = document.createElement("div");
     section.className = "team-section";
 
@@ -248,7 +401,7 @@ function createTeamInputs() {
     header.style.justifyContent = "space-between";
 
     const title = document.createElement("h3");
-    title.textContent = `ラウンド ${round + 1}`;
+    title.textContent = `${round + 1}R`;
 
     const confirmBtn = document.createElement("button");
     confirmBtn.textContent = "確定";
@@ -271,11 +424,13 @@ function createTeamInputs() {
         btn.className = "rank-button";
         btn.textContent = rank;
 
-        btn.dataset.team = team;
-        btn.dataset.round = round;
-        btn.dataset.rank = rank;
+        btn.onclick = () => {
+          if (!state.teamRanks[round]) state.teamRanks[round] = {};
+          state.teamRanks[round][team] = rank;
 
-        btn.onclick = () => toggleRank(team, round, rank, btn);
+          row.querySelectorAll(".rank-button").forEach(b => b.classList.remove("selected"));
+          btn.classList.add("selected");
+        };
 
         row.appendChild(btn);
       }
@@ -288,88 +443,199 @@ function createTeamInputs() {
 }
 
 /* ------------------------------------------------------------
-   ランク選択
+   確定ボタン → GAS に途中結果送信
 ------------------------------------------------------------ */
-function toggleRank(team, round, rank, btn) {
-  if (!state.teamRanks[round]) state.teamRanks[round] = {};
-  state.teamRanks[round][team] = rank;
-
-  const buttons = btn.parentNode.querySelectorAll(".rank-button");
-  buttons.forEach(b => b.classList.remove("selected"));
-  btn.classList.add("selected");
-}
-
 function confirmRound(round) {
-  alert(`ラウンド ${round + 1} を確定しました`);
+  alert(`${round + 1}R を確定しました`);
+
+  sendOverlayToGAS();
+  checkIfSetFinished();
 }
 
 /* ------------------------------------------------------------
-   スコア計算（必要なら後で拡張）
+   GAS に途中結果送信（OBS 更新用）
 ------------------------------------------------------------ */
-function calculateTeamScores() {
-  return {}; // 必要なら後で実装
-}
-
-/* ------------------------------------------------------------
-   ローカル保存（1 試合）
------------------------------------------------------------- */
-async function saveHistoryToLocal() {
-  const timestamp = getUserTimestamp();
-
-  const record = {
+async function sendOverlayToGAS() {
+  const overlayData = {
+    timestamp: getUserTimestamp(),
     teamId: state.teamId,
     mode: state.mode,
     teams: state.teams,
     teamRanks: state.teamRanks,
-    teamScores: calculateTeamScores(),
     courseNames: state.courseNames,
-    penalty: state.penalty,
-    timestamp: timestamp
+    penalty: state.penalty
+  };
+
+  await fetch(GAS_URL, {
+    method: "POST",
+    body: JSON.stringify(overlayData)
+  });
+
+  console.log("GAS に途中結果を送信しました");
+}
+
+/* ------------------------------------------------------------
+   GAS overlay リセット
+------------------------------------------------------------ */
+async function resetOverlayOnGAS() {
+  await fetch(GAS_URL + "?reset=1");
+  console.log("GAS overlay をリセットしました");
+}
+
+/* ------------------------------------------------------------
+   12R 終了チェック
+------------------------------------------------------------ */
+function checkIfSetFinished() {
+  let filled = 0;
+
+  for (let r = 0; r < 12; r++) {
+    if (state.teamRanks[r] && Object.keys(state.teamRanks[r]).length > 0) {
+      filled++;
+    }
+  }
+
+  if (filled === 12) {
+    onSetFinished();
+  }
+}
+
+/* ------------------------------------------------------------
+   12R 終了 → リザルト画像生成 → GAS 送信 → overlay リセット
+------------------------------------------------------------ */
+async function onSetFinished() {
+  const imgBase64 = generateResultImage();
+
+  await fetch(GAS_URL, {
+    method: "POST",
+    body: JSON.stringify({
+      type: "resultImage",
+      image: imgBase64
+    })
+  });
+
+  await resetOverlayOnGAS();
+
+  alert("12R 終了 → リザルト画像を送信しました");
+}
+
+/* ------------------------------------------------------------
+   リザルト画像生成（Canvas）
+------------------------------------------------------------ */
+function generateResultImage() {
+  const canvas = document.createElement("canvas");
+  canvas.width = 1280;
+  canvas.height = 720;
+
+  const ctx = canvas.getContext("2d");
+
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.fillStyle = "#fff";
+  ctx.font = "48px sans-serif";
+  ctx.fillText("RESULT", 50, 80);
+
+  ctx.font = "32px sans-serif";
+  let y = 150;
+
+  state.teams.forEach(team => {
+    const score = calculateTeamTotalScore(team);
+    ctx.fillText(`${team}: ${score} pts`, 50, y);
+    y += 50;
+  });
+
+  return canvas.toDataURL("image/png");
+}
+
+/* ------------------------------------------------------------
+   スコア計算（簡易）
+------------------------------------------------------------ */
+function calculateTeamTotalScore(team) {
+  let total = 0;
+
+  for (let r = 0; r < 12; r++) {
+    if (state.teamRanks[r] && state.teamRanks[r][team]) {
+      const rank = state.teamRanks[r][team];
+      total += (25 - rank); // 仮スコア
+    }
+  }
+
+  return total;
+}
+
+/* ------------------------------------------------------------
+   ローカル保存
+------------------------------------------------------------ */
+async function saveHistoryRecord() {
+  const timestamp = getUserTimestamp();
+
+  const record = {
+    id: timestamp,
+    timestamp,
+    teamId: state.teamId,
+    mode: state.mode,
+    teams: state.teams,
+    teamRanks: state.teamRanks,
+    courseNames: state.courseNames,
+    penalty: state.penalty
   };
 
   const db = await openDB();
   const tx = db.transaction("history", "readwrite");
-  const store = tx.objectStore("history");
-
-  const all = await store.getAll();
-
-  if (isDuplicateRecord(record, all)) {
-    alert("この戦績はすでに存在します（重複スキップ）");
-    return;
-  }
-
-  store.put({ id: timestamp, ...record });
+  tx.objectStore("history").put(record);
   await tx.complete;
 
-  alert("戦績を保存しました");
-  loadHistoryList();
+  alert("ローカル保存しました");
+  loadLocalHistory();
 }
 
 /* ------------------------------------------------------------
-   JSON 全戦績エクスポート
+   ローカル履歴表示
+------------------------------------------------------------ */
+async function loadLocalHistory() {
+  const db = await openDB();
+  const tx = db.transaction("history", "readonly");
+  const all = await tx.objectStore("history").getAll();
+
+  const list = document.getElementById("localHistory");
+  list.innerHTML = "";
+
+  all.sort((a, b) => b.timestamp - a.timestamp);
+
+  all.forEach(r => {
+    const div = document.createElement("div");
+    div.className = "history-item";
+    div.textContent = `${new Date(r.timestamp).toLocaleString()} / ${r.teamId}`;
+    list.appendChild(div);
+  });
+}
+
+/* ------------------------------------------------------------
+   JSON エクスポート
 ------------------------------------------------------------ */
 async function exportAllHistoryJSON() {
   const db = await openDB();
   const tx = db.transaction("history", "readonly");
-  const store = tx.objectStore("history");
-  const all = await store.getAll();
+  const all = await tx.objectStore("history").getAll();
 
-  const blob = new Blob([JSON.stringify(all, null, 2)], {
-    type: "application/json"
-  });
-
+  const blob = new Blob([JSON.stringify(all, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
+
   const a = document.createElement("a");
   a.href = url;
-  a.download = `mk_history_all_${Date.now()}.json`;
+  a.download = "mk_history.json";
   a.click();
+
   URL.revokeObjectURL(url);
 }
 
 /* ------------------------------------------------------------
-   JSON 全戦績インポート
+   JSON インポート
 ------------------------------------------------------------ */
-async function importAllHistoryJSON(file) {
+document.getElementById("importAllJson").onchange = async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+
   const text = await file.text();
   const list = JSON.parse(text);
 
@@ -377,25 +643,15 @@ async function importAllHistoryJSON(file) {
   const tx = db.transaction("history", "readwrite");
   const store = tx.objectStore("history");
 
-  const existing = await store.getAll();
-
-  let added = 0;
-  for (const record of list) {
-    if (!isDuplicateRecord(record, existing)) {
-      store.put({ id: record.timestamp, ...record });
-      existing.push(record);
-      added++;
-    }
-  }
-
+  list.forEach(r => store.put(r));
   await tx.complete;
 
-  alert(`全戦績インポート完了：${added} 件追加`);
-  loadHistoryList();
-}
+  alert("インポート完了");
+  loadLocalHistory();
+};
 
 /* ------------------------------------------------------------
-   P2P（全戦績同期）
+   P2P（既存のあなたの構成に合わせて簡易版）
 ------------------------------------------------------------ */
 let peerConnection;
 let dataChannel;
@@ -404,25 +660,21 @@ async function p2pCreateOffer() {
   peerConnection = new RTCPeerConnection();
   dataChannel = peerConnection.createDataChannel("mkdata");
 
-  dataChannel.onopen = () => alert("P2P 接続完了");
   dataChannel.onmessage = e => receiveP2PData(e.data);
 
   const offer = await peerConnection.createOffer();
   await peerConnection.setLocalDescription(offer);
 
-  document.getElementById("offerBox").value =
-    btoa(JSON.stringify(offer));
+  document.getElementById("offerBox").value = btoa(JSON.stringify(offer));
 }
 
 async function p2pAcceptOffer() {
   const offer = JSON.parse(atob(document.getElementById("offerBox").value));
 
   peerConnection = new RTCPeerConnection();
-
   peerConnection.ondatachannel = e => {
     dataChannel = e.channel;
-    dataChannel.onopen = () => alert("P2P 接続完了");
-    dataChannel.onmessage = e => receiveP2PData(e.data);
+    dataChannel.onmessage = ev => receiveP2PData(ev.data);
   };
 
   await peerConnection.setRemoteDescription(offer);
@@ -430,8 +682,7 @@ async function p2pAcceptOffer() {
   const answer = await peerConnection.createAnswer();
   await peerConnection.setLocalDescription(answer);
 
-  document.getElementById("answerBox").value =
-    btoa(JSON.stringify(answer));
+  document.getElementById("answerBox").value = btoa(JSON.stringify(answer));
 }
 
 async function p2pAcceptAnswer() {
@@ -442,71 +693,38 @@ async function p2pAcceptAnswer() {
 async function p2pSendAll() {
   const db = await openDB();
   const tx = db.transaction("history", "readonly");
-  const store = tx.objectStore("history");
-  const all = await store.getAll();
+  const all = await tx.objectStore("history").getAll();
 
-  const ts = getUserTimestamp();
-  const updated = all.map(r => ({ ...r, timestamp: ts }));
-
-  dataChannel.send(JSON.stringify({
-    type: "allHistory",
-    data: updated
-  }));
-
-  alert("全戦績データを送信しました");
+  dataChannel.send(JSON.stringify({ type: "allHistory", data: all }));
+  alert("全戦績を送信しました");
 }
 
-function receiveP2PData(text) {
+async function receiveP2PData(text) {
   const packet = JSON.parse(text);
 
   if (packet.type === "allHistory") {
-    mergeAllHistory(packet.data);
+    const db = await openDB();
+    const tx = db.transaction("history", "readwrite");
+    const store = tx.objectStore("history");
+
+    packet.data.forEach(r => store.put(r));
+    await tx.complete;
+
+    alert("全戦績を受信しました");
+    loadLocalHistory();
   }
-}
-
-async function mergeAllHistory(list) {
-  const db = await openDB();
-  const tx = db.transaction("history", "readwrite");
-  const store = tx.objectStore("history");
-
-  const existing = await store.getAll();
-
-  let added = 0;
-  for (const record of list) {
-    if (!isDuplicateRecord(record, existing)) {
-      store.put({ id: record.timestamp, ...record });
-      existing.push(record);
-      added++;
-    }
-  }
-
-  await tx.complete;
-
-  alert(`P2P で全戦績受信：${added} 件追加`);
-  loadHistoryList();
 }
 
 /* ------------------------------------------------------------
-   履歴表示
+   初期化
 ------------------------------------------------------------ */
-async function loadHistoryList() {
-  const db = await openDB();
-  const tx = db.transaction("history", "readonly");
-  const store = tx.objectStore("history");
-  const all = await store.getAll();
-
-  const list = document.getElementById("historyList");
-  list.innerHTML = "";
-
-  all.sort((a, b) => b.timestamp - a.timestamp);
-
-  all.forEach(r => {
-    const div = document.createElement("div");
-    div.className = "history-item";
-    div.textContent = `${r.teams[0]} / ${new Date(r.timestamp).toLocaleString()}`;
-    list.appendChild(div);
-  });
+async function init() {
+  await openDB();
+  loadLocalHistory();
+  createTeamInputs();
 }
+
+init();
 
 </script>
 </body>
