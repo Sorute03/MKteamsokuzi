@@ -1,243 +1,658 @@
 /* ============================================================
-   状態管理
+   基本設定・状態
 ============================================================ */
-let state = {
-  teams: [],
-  courses: [],
-  teamRanks: {},   // round → { team: rank }
-  penalty: 0
+
+const totalRounds = 12;
+
+const state = {
+  mode: "6v6",
+  teams: ["チーム1","チーム2","チーム3","チーム4"],
+  myTeam: "チーム1",
+  enemyTeams: ["チーム2","チーム3","チーム4"],
+
+  courseList: [
+    // ここにコース名一覧を入れる
+  ],
+
+  teamSizeMap: {},
+  teamRanks: {},                 // teamRanks[team][round] = [rank, ...]
+  courseNames: Array(totalRounds).fill(""),
+  penalty: {},
+  currentRound: 0,
+  timestamp: null,               // 保存用タイムスタンプ
+  _history: []                   // 履歴キャッシュ
 };
 
-/* ============================================================
-   タブ切り替え
-============================================================ */
-function openTab(id) {
-  document.querySelectorAll(".section").forEach(sec => sec.style.display = "none");
-  document.getElementById(id).style.display = "block";
 
-  document.querySelectorAll(".tab button").forEach(btn => btn.classList.remove("active"));
-  event.target.classList.add("active");
+/* ============================================================
+   IndexedDB（history）
+============================================================ */
+
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open("mk_history", 1);
+    req.onupgradeneeded = e => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains("history")) {
+        db.createObjectStore("history", { keyPath:"id" });
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
 }
 
-/* ============================================================
-   チーム設定
-============================================================ */
-function setTeams() {
-  const input = document.getElementById("teamInput").value.trim();
-  if (!input) return alert("チーム名を入力してください");
+async function saveHistoryRecord() {
+  const db = await openDB();
+  const tx = db.transaction("history", "readwrite");
+  const store = tx.objectStore("history");
 
-  state.teams = input.split(",").map(t => t.trim());
-  renderRounds();
-  renderScoreTable();
+  const ts = getUserTimestamp();
+  state.timestamp = ts;
+
+  const record = {
+    id: ts,
+    timestamp: ts,
+    teams: state.teams,
+    myTeam: state.myTeam,
+    enemyTeams: state.enemyTeams,
+    courses: state.courseNames,
+    teamRanks: state.teamRanks,
+    penalty: state.penalty
+  };
+
+  const allReq = store.getAll();
+  allReq.onsuccess = () => {
+    const existing = allReq.result || [];
+
+    if (isFullDataDuplicate(record, existing)) {
+      alert("この試合はすでに保存されています（重複）");
+      return;
+    }
+
+    store.put(record);
+    alert("試合を保存しました");
+    loadLocalHistory();
+  };
 }
 
-/* ============================================================
-   コース設定
-============================================================ */
-function setCourses() {
-  const input = document.getElementById("courseInput").value.trim();
-  if (!input) return alert("コース名を入力してください");
+async function loadLocalHistory() {
+  const db = await openDB();
+  const tx = db.transaction("history", "readonly");
+  const store = tx.objectStore("history");
+  const req = store.getAll();
 
-  state.courses = input.split(",").map(t => t.trim());
-  renderRounds();
+  req.onsuccess = () => {
+    const list = req.result || [];
+    state._history = list;
+    renderLocalHistory(list);
+  };
 }
 
+function renderLocalHistory(list) {
+  const container = document.getElementById("localHistory");
+  if (!container) return;
+  container.innerHTML = "";
+
+  if (!list.length) {
+    container.textContent = "保存された戦績はありません。";
+    return;
+  }
+
+  list
+    .sort((a,b)=>b.timestamp - a.timestamp)
+    .forEach(rec => {
+      const div = document.createElement("div");
+      div.className = "record";
+
+      const d = new Date(rec.timestamp || rec.id);
+      const dateStr = d.toLocaleString();
+
+      const scores = calcScoresFromRecord(rec);
+      const ranking = Object.entries(scores)
+        .sort((a,b)=>b[1]-a[1])
+        .map(([team,score],i)=>`${i+1}位 ${team} ${score}点`)
+        .join(" / ");
+
+      div.innerHTML = `
+        <div><strong>${dateStr}</strong>（自チーム：${rec.myTeam}）</div>
+        <div>${ranking}</div>
+      `;
+      container.appendChild(div);
+    });
+}
+
+function calcScoresFromRecord(rec) {
+  const result = {};
+  rec.teams.forEach(team => {
+    let score = 0;
+    for (let r=0; r<totalRounds; r++) {
+      const ranks = (rec.teamRanks[team] && rec.teamRanks[team][r]) || [];
+      ranks.forEach(rank => score += getPointsByRank(rank));
+    }
+    score += (rec.penalty && rec.penalty[team]) || 0;
+    result[team] = score;
+  });
+  return result;
+}
+
+
 /* ============================================================
-   ラウンド UI
+   重複チェック
 ============================================================ */
-function renderRounds() {
-  const box = document.getElementById("roundContainer");
-  box.innerHTML = "";
 
-  for (let r = 0; r < 12; r++) {
-    const div = document.createElement("div");
-    div.className = "roundBox";
+function isFullDataDuplicate(record, existingList) {
+  return existingList.some(existing => {
+    // A. タイムスタンプ & 自チーム名一致
+    if (existing.timestamp && record.timestamp) {
+      if (existing.timestamp === record.timestamp &&
+          existing.myTeam === record.myTeam) {
+        return true;
+      }
+    }
 
-    const course = document.createElement("select");
-    course.innerHTML = state.courses.map(c => `<option>${c}</option>`).join("");
+    // B. 全データ完全一致
+    const sameTeams   = JSON.stringify(existing.teams)     === JSON.stringify(record.teams);
+    const sameCourses = JSON.stringify(existing.courses)   === JSON.stringify(record.courses);
+    const sameRanks   = JSON.stringify(existing.teamRanks) === JSON.stringify(record.teamRanks);
 
-    const teamSelects = state.teams.map(team => {
-      return `<select id="r${r}_${team}">
-                ${state.teams.map((_, i) => `<option>${i + 1}</option>`).join("")}
-              </select>`;
-    }).join("");
+    if (sameTeams && sameCourses && sameRanks) {
+      return true;
+    }
 
-    div.innerHTML = `
-      <strong>${r + 1}R</strong>
-      ${teamSelects}
-      <button onclick="confirmRound(${r})">確定</button>
+    return false;
+  });
+}
+
+
+/* ============================================================
+   タイムスタンプ入力
+============================================================ */
+
+function getUserTimestamp() {
+  const input = document.getElementById("timestampInput");
+  if (!input) return Date.now();
+
+  const raw = input.value.trim();
+  if (!raw) {
+    return Date.now();
+  }
+
+  let s = raw
+    .replace(/年/g, "/")
+    .replace(/月/g, "/")
+    .replace(/日/g, "")
+    .replace(/時/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (/ \d{1,2}$/.test(s)) {
+    s = s + ":00";
+  }
+
+  const d = new Date(s);
+  if (isNaN(d.getTime())) {
+    alert("タイムスタンプの形式が不正です（例: 2026/6/3 21）");
+    return Date.now();
+  }
+
+  return d.getTime();
+}
+
+
+/* ============================================================
+   チーム名・モード設定
+============================================================ */
+
+function createEnemyTeamEditor() {
+  const count = parseInt(document.getElementById("teamCountSelect").value);
+  const container = document.getElementById("enemyTeamEditor");
+  container.innerHTML = "";
+
+  for (let i = 1; i < count; i++) {
+    const name = state.enemyTeams[i-1] || `チーム${i+1}`;
+    const row = document.createElement("div");
+    row.innerHTML = `
+      <label>敵チーム${i}：</label>
+      <input id="enemyTeamInput-${i}" value="${name}">
     `;
-
-    box.appendChild(div);
+    container.appendChild(row);
   }
 }
+
+function createTeamNameEditor() {
+  document.getElementById("myTeamInput").value = state.myTeam;
+  createEnemyTeamEditor();
+}
+
+function applyTeamNames() {
+  const count = parseInt(document.getElementById("teamCountSelect").value);
+
+  const myTeam = document.getElementById("myTeamInput").value.trim() || "自チーム";
+  const enemyTeams = [];
+  for (let i = 1; i < count; i++) {
+    const v = document.getElementById(`enemyTeamInput-${i}`).value.trim();
+    enemyTeams.push(v || `敵チーム${i}`);
+  }
+
+  state.myTeam = myTeam;
+  state.enemyTeams = enemyTeams;
+  state.teams = [myTeam, ...enemyTeams];
+  state.penalty = {};
+
+  setFormatFromMode(state.mode);
+  alert("チーム名を更新しました");
+}
+
+function setFormatFromMode(modeStr) {
+  state.mode = modeStr;
+
+  const size = parseInt(modeStr.split("v")[0]);
+  const totalPlayers = 24;
+  const teamCount = totalPlayers / size;
+
+  document.getElementById("teamCountSelect").value = String(teamCount);
+
+  const names = [];
+  names.push(state.myTeam || "チーム1");
+  for (let i = 1; i < teamCount; i++) {
+    names.push(state.enemyTeams[i-1] || `チーム${i+1}`);
+  }
+  state.teams = names;
+  state.enemyTeams = names.slice(1);
+
+  state.teamSizeMap = {};
+  state.teams.forEach(team => state.teamSizeMap[team] = size);
+
+  state.teamRanks = {};
+  state.teams.forEach(team => {
+    state.teamRanks[team] = {};
+    for (let r=0; r<totalRounds; r++) state.teamRanks[team][r] = [];
+  });
+
+  createTeamNameEditor();
+  createCourseSelectors();
+  createTeamInputs();
+  updateScores();
+}
+
+
+/* ============================================================
+   コース選択
+============================================================ */
+
+function createCourseSelectors() {
+  const container = document.getElementById("course-container");
+  container.innerHTML = "";
+
+  for (let i=0; i<totalRounds; i++) {
+    const row = document.createElement("div");
+    row.innerHTML = `
+      <label>ラウンド${i+1}：</label>
+      <select id="course-select-${i}">
+        ${state.courseList.map(c => `<option>${c}</option>`).join("")}
+      </select>
+    `;
+    container.appendChild(row);
+  }
+}
+
+
+/* ============================================================
+   順位入力（24 ボタン）
+============================================================ */
+
+function createTeamInputs() {
+  const container = document.getElementById("teams-container");
+  container.innerHTML = "";
+
+  for (let round=0; round<totalRounds; round++) {
+    const section = document.createElement("div");
+    section.className = "team-section";
+
+    const header = document.createElement("div");
+    header.style.display = "flex";
+    header.style.justifyContent = "space-between";
+    header.innerHTML = `
+      <h3>ラウンド${round+1}</h3>
+      <button onclick="confirmRound(${round})">確定</button>
+    `;
+    section.appendChild(header);
+
+    state.teams.forEach(team => {
+      const label = document.createElement("div");
+      label.textContent = team;
+
+      const row = document.createElement("div");
+      row.className = "rank-buttons";
+
+      for (let rank=1; rank<=24; rank++) {
+        const btn = document.createElement("div");
+        btn.className = "rank-button";
+        btn.textContent = rank;
+        btn.dataset.team = team;
+        btn.dataset.round = round;
+        btn.dataset.rank = rank;
+        btn.onclick = () => toggleRank(team, round, rank, btn);
+        row.appendChild(btn);
+      }
+
+      section.appendChild(label);
+      section.appendChild(row);
+    });
+
+    container.appendChild(section);
+  }
+}
+
+function toggleRank(team, round, rank, btn) {
+  const arr = state.teamRanks[team][round];
+  const idx = arr.indexOf(rank);
+
+  if (idx >= 0) {
+    arr.splice(idx,1);
+    btn.classList.remove("selected");
+  } else {
+    if (arr.length < state.teamSizeMap[team]) {
+      arr.push(rank);
+      btn.classList.add("selected");
+    } else {
+      alert(`${team} は最大 ${state.teamSizeMap[team]} 人です`);
+    }
+  }
+
+  autoFillMissingTeam(round);
+  updateScores();
+}
+
+function autoFillMissingTeam(round) {
+  const filled = state.teams.filter(t =>
+    state.teamRanks[t][round].length === state.teamSizeMap[t]
+  );
+  if (filled.length < state.teams.length - 1) return;
+
+  const used = new Set();
+  state.teams.forEach(t => {
+    state.teamRanks[t][round].forEach(r => used.add(r));
+  });
+
+  const remaining = Array.from({length:24},(_,i)=>i+1).filter(r=>!used.has(r));
+
+  state.teams.forEach(team => {
+    const need = state.teamSizeMap[team];
+    const arr = state.teamRanks[team][round];
+    while (arr.length < need && remaining.length > 0) {
+      const next = remaining.shift();
+      arr.push(next);
+      const btn = document.querySelector(
+        `.rank-button[data-team="${team}"][data-round="${round}"][data-rank="${next}"]`
+      );
+      if (btn) btn.classList.add("selected");
+    }
+  });
+}
+
+/* ============================================================
+   得点計算
+============================================================ */
+
+function getPointsByRank(rank) {
+  if (rank===1) return 15;
+  if (rank===2) return 12;
+  if (rank===3) return 10;
+  if (rank===4||rank===5) return 9;
+  if (rank===6||rank===7) return 8;
+  if (rank===8||rank===9) return 7;
+  if (rank>=10 && rank<=12) return 6;
+  if (rank>=13 && rank<=15) return 5;
+  if (rank>=16 && rank<=18) return 4;
+  if (rank>=19 && rank<=21) return 3;
+  if (rank===22||rank===23) return 2;
+  if (rank===24) return 1;
+  return 0;
+}
+
+function calculateTeamScores() {
+  const result = {};
+  state.teams.forEach(team => {
+    let score = 0;
+    for (let r=0; r<totalRounds; r++) {
+      state.teamRanks[team][r].forEach(rank => {
+        score += getPointsByRank(rank);
+      });
+    }
+    score += (state.penalty[team] || 0);
+    result[team] = score;
+  });
+  return result;
+}
+
+function updateScores() {
+  const scores = calculateTeamScores();
+  const results = Object.entries(scores).sort((a,b)=>b[1]-a[1]);
+
+  const tbody = document.querySelector("#scoreTable tbody");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+  results.forEach(([team,score],i)=>{
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${i+1}</td><td>${team}</td><td>${score}</td>`;
+    tbody.appendChild(tr);
+  });
+
+  // ★ 追加：オーバーレイへ送信
+  sendOverlay();
+}
+
+
 
 /* ============================================================
    ラウンド確定
 ============================================================ */
+
 function confirmRound(round) {
-  const ranks = {};
-  state.teams.forEach(team => {
-    const sel = document.getElementById(`r${round}_${team}`);
-    ranks[team] = Number(sel.value);
-  });
+  const courseSel = document.getElementById(`course-select-${round}`);
+  if (courseSel) {
+    state.courseNames[round] = courseSel.value;
+  }
 
-  state.teamRanks[round] = ranks;
-
-  renderScoreTable();
-  sendOverlayToGAS();
-  sendCurrentScoreEmbedToSelected(round);
-  checkIfSetFinished();
-}
-
-/* ============================================================
-   スコア計算
-============================================================ */
-function calcScores() {
-  const scores = {};
-  state.teams.forEach(t => scores[t] = 0);
-
-  for (let r = 0; r < 12; r++) {
-    if (!state.teamRanks[r]) continue;
-    for (const team in state.teamRanks[r]) {
-      const rank = state.teamRanks[r][team];
-      scores[team] += (25 - rank);
+  for (const team of state.teams) {
+    const need = state.teamSizeMap[team];
+    const arr = state.teamRanks[team][round];
+    if (arr.length !== need) {
+      alert(`${team} の人数が不足しています`);
+      return;
     }
   }
 
-  scores[state.teams[0]] += state.penalty;
-  return scores;
+  alert(`ラウンド${round+1}を保存しました`);
+
+  // ★ 追加：オーバーレイへ送信
+  sendOverlay();
 }
 
-/* ============================================================
-   スコアテーブル描画
-============================================================ */
-function renderScoreTable() {
-  const table = document.getElementById("scoreTable");
-  const scores = calcScores();
 
-  let html = "<tr><th>チーム</th><th>スコア</th></tr>";
-  state.teams.forEach(t => {
-    html += `<tr><td>${t}</td><td>${scores[t]}</td></tr>`;
-  });
-
-  table.innerHTML = html;
-}
 
 /* ============================================================
    ペナルティ
 ============================================================ */
-function applyPenalty() {
-  state.penalty = Number(document.getElementById("penaltyInput").value);
-  renderScoreTable();
+
+function openPenaltyTeamSelect() {
+  const container = document.getElementById("penaltyTeamButtons");
+  container.innerHTML = "";
+  state.teams.forEach(team=>{
+    const btn = document.createElement("button");
+    btn.textContent = team;
+    btn.onclick = ()=>selectPenaltyTeam(team);
+    container.appendChild(btn);
+  });
+  document.getElementById("penaltyModal").style.display = "block";
 }
+
+function closePenaltyModal() {
+  document.getElementById("penaltyModal").style.display = "none";
+}
+
+function selectPenaltyTeam(team) {
+  closePenaltyModal();
+  const p = parseInt(prompt(`${team} のペナルティ点数`),10);
+  if (!p) return;
+  state.penalty[team] = (state.penalty[team] || 0) + p;
+  updateScores();
+
+  // ★ 追加
+  sendOverlay();
+}
+
+
 
 /* ============================================================
-   GAS overlay 送信
+   リセット
 ============================================================ */
-const GAS_URL = "YOUR_GAS_URL_HERE";
 
-async function sendOverlayToGAS() {
-  await fetch(GAS_URL, {
-    method: "POST",
-    body: JSON.stringify({
-      type: "overlay",
-      teams: state.teams,
-      teamRanks: state.teamRanks
-    })
-  });
+function resetRanks() {
+  if (!confirm("リセットしますか？")) return;
+  setFormatFromMode(state.mode);
+
+  // ★ 追加
+  sendOverlay();
 }
 
-async function resetOverlayOnGAS() {
-  await fetch(GAS_URL, {
-    method: "POST",
-    body: JSON.stringify({ type: "reset" })
-  });
-}
+
 
 /* ============================================================
-   Webhook（複数登録 → 1つ選択）
+   集計機能
 ============================================================ */
-let webhookList = JSON.parse(localStorage.getItem("webhookList") || "[]");
-let activeWebhookIndex = Number(localStorage.getItem("activeWebhookIndex") || -1);
 
-function saveWebhookList() {
-  localStorage.setItem("webhookList", JSON.stringify(webhookList));
-  localStorage.setItem("activeWebhookIndex", activeWebhookIndex);
-  renderWebhookList();
+function calcRoundScores() {
+  const roundScores = {};
+
+  for (let r = 0; r < totalRounds; r++) {
+    roundScores[r] = {};
+    for (const team of state.teams) {
+      const ranks = state.teamRanks[team][r] || [];
+      let score = 0;
+      ranks.forEach(rank => score += getPointsByRank(rank));
+      roundScores[r][team] = score;
+    }
+  }
+
+  return roundScores;
 }
 
-function addWebhook() {
-  const url = document.getElementById("webhookInput").value.trim();
-  if (!url) return alert("Webhook URL を入力してください");
+function calcTeamProgress() {
+  const progress = {};
 
-  webhookList.push(url);
-  activeWebhookIndex = webhookList.length - 1;
-  saveWebhookList();
+  for (const team of state.teams) {
+    progress[team] = [];
+    for (let r = 0; r < totalRounds; r++) {
+      const ranks = state.teamRanks[team][r] || [];
+      progress[team].push(ranks.length ? Math.min(...ranks) : null);
+    }
+  }
 
-  document.getElementById("webhookInput").value = "";
+  return progress;
 }
 
-function selectWebhook(i) {
-  activeWebhookIndex = i;
-  saveWebhookList();
+function calcRanking() {
+  const scores = calculateTeamScores();
+
+  return Object.entries(scores)
+    .map(([team, score]) => ({ team, score }))
+    .sort((a, b) => b.score - a.score);
 }
 
-function removeWebhook(i) {
-  webhookList.splice(i, 1);
-  if (activeWebhookIndex === i) activeWebhookIndex = -1;
-  if (activeWebhookIndex > i) activeWebhookIndex--;
-  saveWebhookList();
-}
+function showRanking() {
+  const ranking = calcRanking();
+  if (!ranking.length) return;
+  const top = ranking[0].score;
 
-function renderWebhookList() {
-  const box = document.getElementById("webhookList");
-  box.innerHTML = "";
+  let html = "<h3>順位表</h3>";
+  html += "<table border='1' cellpadding='6'><tr><th>順位</th><th>チーム</th><th>スコア</th><th>差分</th></tr>";
 
-  webhookList.forEach((url, i) => {
-    const div = document.createElement("div");
-    div.innerHTML = `
-      <input type="radio" name="webhookSelect"
-             ${activeWebhookIndex === i ? "checked" : ""}
-             onclick="selectWebhook(${i})">
-      <span>${url}</span>
-      <button onclick="removeWebhook(${i})">削除</button>
-    `;
-    box.appendChild(div);
+  ranking.forEach((t, i) => {
+    const diff = t.score - top;
+    html += `<tr>
+      <td>${i + 1}</td>
+      <td>${t.team}</td>
+      <td>${t.score}</td>
+      <td>${diff === 0 ? "-" : diff}</td>
+    </tr>`;
   });
+
+  html += "</table>";
+  const area = document.getElementById("aggregateArea");
+  if (area) area.innerHTML = html;
 }
-renderWebhookList();
+
+function showRoundScores() {
+  const roundScores = calcRoundScores();
+
+  let html = "<h3>ラウンド別スコア</h3>";
+
+  for (let r = 0; r < totalRounds; r++) {
+    html += `<h4>${r + 1}R</h4>`;
+    html += "<table border='1' cellpadding='6'><tr><th>チーム</th><th>得点</th></tr>";
+
+    for (const team of state.teams) {
+      html += `<tr><td>${team}</td><td>${roundScores[r][team]}</td></tr>`;
+    }
+
+    html += "</table>";
+  }
+
+  const area = document.getElementById("aggregateArea");
+  if (area) area.innerHTML = html;
+}
+
+function showTeamProgress() {
+  const progress = calcTeamProgress();
+
+  let html = "<h3>チーム別順位推移</h3>";
+
+  for (const team of state.teams) {
+    html += `<h4>${team}</h4>`;
+    html += `<p>${progress[team].map(v => v ?? "-").join(" → ")}</p>`;
+  }
+
+  const area = document.getElementById("aggregateArea");
+  if (area) area.innerHTML = html;
+}
+
 
 /* ============================================================
-   途中経過（順位表）を選択された Webhook に送信
+   即時集計送信（Webhook）
 ============================================================ */
-async function sendCurrentScoreEmbedToSelected(round) {
-  if (activeWebhookIndex < 0) return;
+
+let webhookList = [];        // 外部で設定される想定
+let activeWebhookIndex = -1; // 外部 UI で選択される想定
+
+async function sendInstantScore() {
+  if (!webhookList.length || activeWebhookIndex < 0) {
+    alert("Webhook が選択されていません");
+    return;
+  }
 
   const url = webhookList[activeWebhookIndex];
-  const scores = calcScores();
-
-  const ranking = [...state.teams]
-    .map(name => ({ name, score: scores[name] }))
-    .sort((a, b) => b.score - a.score);
-
-  const topScore = ranking[0].score;
+  const ranking = calcRanking();
+  if (!ranking.length) {
+    alert("スコアがありません");
+    return;
+  }
+  const top = ranking[0].score;
 
   const text =
-    `【${round + 1}ラウンド終了】\n\n` +
-    ranking
-      .map((t, i) => {
-        if (i === 0) return `1位：${t.name} ${t.score}点`;
-        const diff = t.score - topScore;
-        return `${i + 1}位：${t.name} ${t.score}点 (${diff})`;
-      })
-      .join("\n");
+    `【即時集計】\n\n` +
+    ranking.map((t, i) => {
+      const diff = t.score - top;
+      return `${i + 1}位：${t.team} ${t.score}点 ${diff === 0 ? "" : `(${diff})`}`;
+    }).join("\n");
 
   const payload = {
     username: "MK Sokuzi",
     embeds: [
       {
-        title: "📊 現在のスコア & 順位（累計）",
+        title: `📊 現在のスコア（自チーム：${state.myTeam}）`,
         description: text,
         color: 3447003,
         timestamp: new Date().toISOString()
@@ -250,429 +665,358 @@ async function sendCurrentScoreEmbedToSelected(round) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload)
   });
+
+  alert("途中経過を送信しました");
 }
 
-/* ============================================================
-   リザルト背景画像（デフォ赤 → ユーザー優先）
-============================================================ */
-let resultBgImage = null;
-
-document.getElementById("resultBgInput").onchange = e => {
-  const file = e.target.files[0];
-  if (!file) return;
-
-  const reader = new FileReader();
-  reader.onload = () => {
-    resultBgImage = new Image();
-    resultBgImage.src = reader.result;
-  };
-  reader.readAsDataURL(file);
-};
 
 /* ============================================================
-   リザルト画像生成（Canvas）
+   JSON 関連
 ============================================================ */
-function generateResultImage() {
-  const canvas = document.createElement("canvas");
-  canvas.width = 1280;
-  canvas.height = 720;
-  const ctx = canvas.getContext("2d");
 
-  if (resultBgImage) {
-    ctx.drawImage(resultBgImage, 0, 0, canvas.width, canvas.height);
-  } else {
-    const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
-    grad.addColorStop(0, "#8b0000");
-    grad.addColorStop(1, "#b30000");
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-  }
-
-  ctx.fillStyle = "white";
-  ctx.font = "bold 48px sans-serif";
-  ctx.fillText("12 race result", 40, 80);
-
-  const scores = calcScores();
-  const sorted = [...state.teams].sort((a, b) => scores[b] - scores[a]);
-  const topScore = scores[sorted[0]];
-
-  ctx.font = "bold 36px sans-serif";
-  let y = 160;
-
-  sorted.forEach((team, i) => {
-    const score = scores[team];
-    const diff = score - topScore;
-    const diffText = diff === 0 ? "" : ` (${diff > 0 ? "+" : ""}${diff})`;
-
-    ctx.fillText(`${i + 1}位：${team}  ${score}点${diffText}`, 40, y);
-    y += 60;
-  });
-
-  const graphX = 40;
-  const graphY = 400;
-  const graphW = 1200;
-  const graphH = 250;
-
-  ctx.strokeStyle = "rgba(255,255,255,0.3)";
-  ctx.strokeRect(graphX, graphY, graphW, graphH);
-
-  const colors = ["#ff5555", "#55aaff", "#55ff55", "#ffaa00", "#ff55ff", "#00ffaa"];
-
-  sorted.forEach((team, idx) => {
-    ctx.strokeStyle = colors[idx % colors.length];
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-
-    for (let r = 0; r < 12; r++) {
-      const rank = state.teamRanks[r]?.[team] ?? 24;
-      const score = 25 - rank;
-
-      const x = graphX + (graphW / 11) * r;
-      const y = graphY + graphH - (score * (graphH / 25));
-
-      if (r === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-
-    ctx.stroke();
-  });
-
-  return canvas.toDataURL("image/png");
-}
-
-/* ============================================================
-   リザルト画像を Webhook に送信
-============================================================ */
-async function sendResultImageToSelected(imgBase64) {
-  if (activeWebhookIndex < 0) return;
-
-  const url = webhookList[activeWebhookIndex];
-  const blob = await (await fetch(imgBase64)).blob();
-
-  const form = new FormData();
-  form.append("file", blob, "result.png");
-  form.append("payload_json", JSON.stringify({
-    username: "MK Sokuzi",
-    content: "12R 終了 — リザルト画像"
-  }));
-
-  await fetch(url, {
-    method: "POST",
-    body: form
-  });
-}
-
-/* ============================================================
-   12R 終了処理
-============================================================ */
-function checkIfSetFinished() {
-  if (Object.keys(state.teamRanks).length === 12) {
-    onSetFinished();
-  }
-}
-
-async function onSetFinished() {
-  const imgBase64 = generateResultImage();
-
-  document.getElementById("resultImageLocal").src = imgBase64;
-  document.getElementById("resultImageArea").style.display = "block";
-
-  await fetch(GAS_URL, {
-    method: "POST",
-    body: JSON.stringify({
-      type: "resultImage",
-      image: imgBase64
-    })
-  });
-
-  await sendResultImageToSelected(imgBase64);
-  await resetOverlayOnGAS();
-
-  alert("12R 終了 → リザルト画像を生成し、選択された Webhook に送信しました");
-}
-
-/* ============================================================
-   画像保存
-============================================================ */
-function downloadResultImage() {
-  const img = document.getElementById("resultImageLocal").src;
-  const a = document.createElement("a");
-  a.href = img;
-  a.download = "result.png";
-  a.click();
-}
-
-/* ============================================================
-   OBS overlay
-============================================================ */
-function openOverlay() {
-  window.open("overlay.html", "_blank");
-}
-
-/* ============================================================
-   IndexedDB 初期化
-============================================================ */
-let db;
-
-function openDB() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open("MK_SOKUZI_DB", 1);
-
-    req.onupgradeneeded = e => {
-      db = e.target.result;
-      db.createObjectStore("save", { keyPath: "id" });
-    };
-
-    req.onsuccess = e => {
-      db = e.target.result;
-      resolve();
-    };
-
-    req.onerror = e => reject(e);
-  });
-}
-
-/* ============================================================
-   IndexedDB 保存（試合データのみ）
-============================================================ */
-async function saveToIndexedDB() {
-  const tx = db.transaction("save", "readwrite");
-  const store = tx.objectStore("save");
-
-  const data = {
-    id: "main",
-    teams: state.teams,
-    courses: state.courses,
-    teamRanks: state.teamRanks,
-    penalty: state.penalty
-  };
-
-  store.put(data);
-}
-
-/* ============================================================
-   IndexedDB 読み込み（起動時）
-============================================================ */
-async function loadFromIndexedDB() {
-  const tx = db.transaction("save", "readonly");
-  const store = tx.objectStore("save");
-
-  const req = store.get("main");
-
-  req.onsuccess = () => {
-    const data = req.result;
-    if (!data) return;
-
-    state.teams = data.teams || [];
-    state.courses = data.courses || [];
-    state.teamRanks = data.teamRanks || {};
-    state.penalty = data.penalty || 0;
-
-    renderRounds();
-    renderScoreTable();
-  };
-}
-
-/* ============================================================
-   JSON エクスポート（試合データのみ）
-============================================================ */
 function exportJSON() {
+  const ts = getUserTimestamp();
+  state.timestamp = ts;
+
   const data = {
+    timestamp: ts,
     teams: state.teams,
-    courses: state.courses,
+    myTeam: state.myTeam,
+    enemyTeams: state.enemyTeams,
+    courses: state.courseNames,
     teamRanks: state.teamRanks,
     penalty: state.penalty
   };
 
-  document.getElementById("jsonArea").value = JSON.stringify(data, null, 2);
+  const area = document.getElementById("jsonArea");
+  if (area) area.value = JSON.stringify(data, null, 2);
 }
 
-/* ============================================================
-   JSON インポート（試合データのみ）
-============================================================ */
 function importJSON() {
+  const area = document.getElementById("jsonArea");
+  if (!area) return;
+
   try {
-    const data = JSON.parse(document.getElementById("jsonArea").value);
+    const data = JSON.parse(area.value);
 
-    state.teams = data.teams || [];
-    state.courses = data.courses || [];
-    state.teamRanks = data.teamRanks || {};
-    state.penalty = data.penalty || 0;
+    const record = {
+      timestamp: data.timestamp || Date.now(),
+      teams: data.teams,
+      myTeam: data.myTeam,
+      enemyTeams: data.enemyTeams,
+      courses: data.courses,
+      teamRanks: data.teamRanks,
+      penalty: data.penalty
+    };
 
-    renderRounds();
-    renderScoreTable();
+    openDB().then(db => {
+      const tx = db.transaction("history", "readonly");
+      const store = tx.objectStore("history");
+      const req = store.getAll();
 
-    saveToIndexedDB();
+      req.onsuccess = () => {
+        const existing = req.result || [];
 
-    alert("JSON を読み込みました");
+        if (isFullDataDuplicate(record, existing)) {
+          alert("読み込んだ JSON は既存データと重複しています");
+          return;
+        }
+
+        state.timestamp   = record.timestamp;
+        state.teams       = record.teams;
+        state.myTeam      = record.myTeam;
+        state.enemyTeams  = record.enemyTeams;
+        state.courseNames = record.courses;
+        state.teamRanks   = record.teamRanks;
+        state.penalty     = record.penalty || {};
+
+        setFormatFromMode(state.mode);
+        updateScores();
+      };
+    });
+
   } catch (e) {
     alert("JSON の形式が正しくありません");
   }
 }
 
-/* ============================================================
-   JSON ファイル保存（download）
-============================================================ */
 function downloadJSONFile() {
+  const ts = getUserTimestamp();
+  state.timestamp = ts;
+
   const data = {
+    timestamp: ts,
     teams: state.teams,
-    courses: state.courses,
+    myTeam: state.myTeam,
+    enemyTeams: state.enemyTeams,
+    courses: state.courseNames,
     teamRanks: state.teamRanks,
     penalty: state.penalty
   };
 
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
-
   const a = document.createElement("a");
   a.href = url;
-  a.download = "mk_sokuzi_data.json";
+  a.download = `mk_result_${ts}.json`;
   a.click();
-
   URL.revokeObjectURL(url);
 }
 
-/* ============================================================
-   JSON ファイル読み込み（upload）
-============================================================ */
 function uploadJSONFile(file) {
+  if (!file) return;
   const reader = new FileReader();
-
   reader.onload = () => {
-    try {
-      const data = JSON.parse(reader.result);
-
-      state.teams = data.teams || [];
-      state.courses = data.courses || [];
-      state.teamRanks = data.teamRanks || {};
-      state.penalty = data.penalty || 0;
-
-      renderRounds();
-      renderScoreTable();
-
-      saveToIndexedDB();
-
-      alert("JSON ファイルを読み込みました");
-    } catch (e) {
-      alert("JSON の形式が正しくありません");
-    }
+    const text = reader.result;
+    const area = document.getElementById("jsonArea");
+    if (area) area.value = text;
+    importJSON();
   };
-
   reader.readAsText(file);
 }
 
-/* ============================================================
-   特定チームだけ JSON 化（テキスト出力）
-============================================================ */
-function exportTeamJSON(teamName) {
-  if (!state.teams.includes(teamName)) {
-    alert("指定されたチームが存在しません");
-    return;
-  }
+function setupJSONDropArea() {
+  const dropArea = document.getElementById("jsonDropArea");
+  if (!dropArea) return;
 
-  const filteredRanks = {};
-
-  for (let r = 0; r < 12; r++) {
-    if (!state.teamRanks[r]) continue;
-    filteredRanks[r] = { [teamName]: state.teamRanks[r][teamName] };
-  }
-
-  const data = {
-    team: teamName,
-    teams: state.teams,
-    courses: state.courses,
-    teamRanks: filteredRanks,
-    penalty: state.penalty
-  };
-
-  document.getElementById("jsonArea").value = JSON.stringify(data, null, 2);
+  dropArea.addEventListener("dragover", e => {
+    e.preventDefault();
+    dropArea.style.background = "#eef";
+  });
+  dropArea.addEventListener("dragleave", e => {
+    e.preventDefault();
+    dropArea.style.background = "#fafafa";
+  });
+  dropArea.addEventListener("drop", e => {
+    e.preventDefault();
+    dropArea.style.background = "#fafafa";
+    const file = e.dataTransfer.files[0];
+    if (file) uploadJSONFile(file);
+  });
 }
 
-/* ============================================================
-   特定チームだけ JSON ファイル保存
-============================================================ */
 function downloadTeamJSONFile(teamName) {
+  if (!teamName) {
+    alert("チーム名を入力してください");
+    return;
+  }
   if (!state.teams.includes(teamName)) {
-    alert("指定されたチームが存在しません");
+    alert("そのチームは現在のデータに存在しません");
     return;
   }
 
-  const filteredRanks = {};
+  const ts = getUserTimestamp();
 
-  for (let r = 0; r < 12; r++) {
-    if (!state.teamRanks[r]) continue;
-    filteredRanks[r] = { [teamName]: state.teamRanks[r][teamName] };
-  }
+  const teamRanks = {};
+  teamRanks[teamName] = state.teamRanks[teamName];
 
   const data = {
-    team: teamName,
-    teams: state.teams,
-    courses: state.courses,
-    teamRanks: filteredRanks,
-    penalty: state.penalty
+    timestamp: ts,
+    teams: [teamName],
+    myTeam: teamName === state.myTeam ? teamName : "",
+    enemyTeams: [],
+    courses: state.courseNames,
+    teamRanks: teamRanks,
+    penalty: { [teamName]: state.penalty[teamName] || 0 }
   };
 
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
-
   const a = document.createElement("a");
   a.href = url;
-  a.download = `mk_sokuzi_${teamName}.json`;
+  a.download = `mk_team_${teamName}_${ts}.json`;
   a.click();
-
   URL.revokeObjectURL(url);
 }
 
 /* ============================================================
-   JSON Drag & Drop 読み込み
+   P2P（簡易版：BroadcastChannel）
 ============================================================ */
-const dropArea = document.getElementById("jsonDropArea");
 
-// ▼ デフォルト動作を無効化
-["dragenter", "dragover", "dragleave", "drop"].forEach(eventName => {
-  dropArea.addEventListener(eventName, e => e.preventDefault());
-});
+let p2pChannel = null;
 
-// ▼ 視覚効果
-dropArea.addEventListener("dragover", () => {
-  dropArea.style.background = "#e0f7ff";
-});
-dropArea.addEventListener("dragleave", () => {
-  dropArea.style.background = "#fafafa";
-});
+function startP2PHost() {
+  if (p2pChannel) p2pChannel.close();
+  p2pChannel = new BroadcastChannel("mk_p2p");
+  p2pChannel.onmessage = onP2PMessage;
 
-// ▼ ドロップ処理
-dropArea.addEventListener("drop", e => {
-  dropArea.style.background = "#fafafa";
+  const status = document.getElementById("p2pStatus");
+  if (status) status.textContent = "P2P ホストとして待機中（同一PC内の他タブと共有）";
 
-  const file = e.dataTransfer.files[0];
-  if (!file) return;
+  sendP2PState();
+}
 
-  if (!file.name.endsWith(".json")) {
-    alert("JSON ファイルをドロップしてください");
-    return;
-  }
+function startP2PClient() {
+  if (p2pChannel) p2pChannel.close();
+  p2pChannel = new BroadcastChannel("mk_p2p");
+  p2pChannel.onmessage = onP2PMessage;
 
-  const reader = new FileReader();
-  reader.onload = () => {
-    try {
-      const data = JSON.parse(reader.result);
+  const status = document.getElementById("p2pStatus");
+  if (status) status.textContent = "P2P クライアントとして接続中（同一PC内の他タブと共有）";
+}
 
-      state.teams = data.teams || [];
-      state.courses = data.courses || [];
-      state.teamRanks = data.teamRanks || {};
-      state.penalty = data.penalty || 0;
-
-      renderRounds();
-      renderScoreTable();
-
-      saveToIndexedDB();
-
-      alert("JSON ファイルを読み込みました");
-    } catch (err) {
-      alert("JSON の形式が正しくありません");
+function sendP2PState() {
+  if (!p2pChannel) return;
+  const data = {
+    type: "state",
+    payload: {
+      timestamp: state.timestamp || Date.now(),
+      teams: state.teams,
+      myTeam: state.myTeam,
+      enemyTeams: state.enemyTeams,
+      courses: state.courseNames,
+      teamRanks: state.teamRanks,
+      penalty: state.penalty
     }
   };
+  p2pChannel.postMessage(data);
+}
 
-  reader.readAsText(file);
+function onP2PMessage(ev) {
+  const msg = ev.data;
+  if (!msg || msg.type !== "state") return;
+
+  const p = msg.payload;
+  state.timestamp   = p.timestamp;
+  state.teams       = p.teams;
+  state.myTeam      = p.myTeam;
+  state.enemyTeams  = p.enemyTeams;
+  state.courseNames = p.courses;
+  state.teamRanks   = p.teamRanks;
+  state.penalty     = p.penalty || {};
+
+  setFormatFromMode(state.mode);
+  updateScores();
+
+  const status = document.getElementById("p2pStatus");
+  if (status) status.textContent = "P2P でデータを受信しました";
+}
+
+
+/* ============================================================
+   リザルト画像生成
+============================================================ */
+
+function generateResultImage() {
+  const canvas = document.getElementById("resultCanvas");
+  if (!canvas) {
+    alert("resultCanvas が見つかりません");
+    return;
+  }
+  const ctx = canvas.getContext("2d");
+  const w = canvas.width;
+  const h = canvas.height;
+
+  ctx.fillStyle = "#20232a";
+  ctx.fillRect(0,0,w,h);
+
+  ctx.fillStyle = "#fff";
+  ctx.font = "28px sans-serif";
+  ctx.fillText("MK Result", 20, 40);
+
+  const d = new Date(state.timestamp || Date.now());
+  ctx.font = "16px sans-serif";
+  ctx.fillText(d.toLocaleString(), 20, 70);
+  ctx.fillText(`自チーム：${state.myTeam}`, 20, 95);
+
+  const scores = calculateTeamScores();
+  const ranking = Object.entries(scores)
+    .sort((a,b)=>b[1]-a[1]);
+
+  ctx.font = "20px sans-serif";
+  ctx.fillText("総合スコア", 20, 130);
+
+  let y = 160;
+  ranking.forEach(([team,score],i)=>{
+    const diff = score - ranking[0][1];
+    ctx.fillStyle = (team === state.myTeam) ? "#4caf50" : "#fff";
+    ctx.fillText(`${i+1}位 ${team} ${score}点 ${diff===0?"":`(${diff})`}`, 40, y);
+    y += 28;
+  });
+
+  const roundScores = calcRoundScores();
+  ctx.fillStyle = "#fff";
+  ctx.font = "18px sans-serif";
+  ctx.fillText("ラウンド別スコア", 20, y + 20);
+
+  let yy = y + 50;
+  for (let r=0; r<totalRounds; r++) {
+    const course = state.courseNames[r] || `R${r+1}`;
+    ctx.font = "14px sans-serif";
+    ctx.fillText(`${r+1}R ${course}`, 20, yy);
+    let xx = 200;
+    ranking.forEach(([team])=>{
+      const s = roundScores[r][team];
+      ctx.fillText(`${team}:${s}`, xx, yy);
+      xx += 150;
+    });
+    yy += 22;
+    if (yy > h - 40) break;
+  }
+
+  canvas.style.display = "block";
+}
+
+
+/* ============================================================
+   共有保存（GAS）ダミー
+============================================================ */
+
+function sendHistoryToGAS() {
+  // HTML の「この試合を共有保存」ボタン用ダミー
+  // 必要になったら GAS_URL を使って実装する
+  alert("共有保存（GAS）はまだ実装されていません");
+}
+
+const OVERLAY_GAS_URL = "https://script.google.com/macros/s/XXXX/exec"; // ← あなたの GAS URL
+
+async function sendOverlay() {
+  const payload = {
+    timestamp: state.timestamp || Date.now(),
+    teams: state.teams,
+    myTeam: state.myTeam,
+    enemyTeams: state.enemyTeams,
+    courses: state.courseNames,
+    teamRanks: state.teamRanks,
+    penalty: state.penalty,
+    scores: calculateTeamScores()
+  };
+
+  try {
+    await fetch(OVERLAY_GAS_URL, {
+      method: "POST",
+      mode: "cors",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    });
+  } catch (e) {
+    console.warn("Overlay 送信失敗:", e);
+  }
+}
+
+
+/* ============================================================
+   タブ初期化・起動
+============================================================ */
+
+function initTabs() {
+  const tabs = document.querySelectorAll(".tabBtn");
+  const contents = document.querySelectorAll(".tabContent");
+  tabs.forEach(btn => {
+    btn.addEventListener("click", () => {
+      const tab = btn.dataset.tab;
+      tabs.forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      contents.forEach(c => {
+        c.style.display = (c.id === tab) ? "block" : "none";
+      });
+    });
+  });
+}
+
+window.addEventListener("load", () => {
+  initTabs();
+  setFormatFromMode(state.mode);
+  setupJSONDropArea();
+  loadLocalHistory();
 });
