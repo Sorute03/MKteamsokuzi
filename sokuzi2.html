@@ -145,6 +145,10 @@ body { margin:0; padding:10px; font-family:sans-serif; }
 
 <!-- リザルトタブ -->
 <div id="resultTab" class="tabContent" style="display:none;">
+  <h3>背景画像</h3>
+  <input type="file" id="bgImageInput" accept="image/*" onchange="loadBackgroundImage(this.files[0])">
+  <div style="font-size:12px;color:#666;">未設定の場合はデフォルト背景を使用</div>
+
 
   <h3>リザルト画像</h3>
   <button onclick="generateResultImage()">リザルト画像を生成</button>
