@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>MK Overlay</title>
+<style>
+body {
+  margin:0;
+  padding:10px;
+  background:#000;
+  color:#fff;
+  font-family:sans-serif;
+}
+.team {
+  font-size:24px;
+  margin:4px 0;
+}
+.my {
+  color:#4caf50;
+  font-weight:bold;
+}
+</style>
+</head>
+<body>
+
+<div id="overlay"></div>
+
+<script>
+const GAS_URL = "https://script.google.com/macros/s/XXXX/exec"; // ← あなたの GAS URL
+
+async function fetchOverlay() {
+  try {
+    const res = await fetch(GAS_URL + "?type=overlay");
+    const data = await res.json();
+    renderOverlay(data);
+  } catch (e) {
+    console.warn("overlay fetch error:", e);
+  }
+}
+
+function renderOverlay(data) {
+  const div = document.getElementById("overlay");
+  if (!data || !data.scores) {
+    div.innerHTML = "<div>waiting...</div>";
+    return;
+  }
+
+  const ranking = Object.entries(data.scores)
+    .sort((a,b)=>b[1]-a[1]);
+
+  const top = ranking[0][1];
+
+  let html = "";
+  ranking.forEach(([team,score])=>{
+    const diff = score - top;
+    const cls = (team === data.myTeam) ? "team my" : "team";
+    html += `<div class="${cls}">${team} ${score} (${diff>=0?diff:""})</div>`;
+  });
+
+  div.innerHTML = html;
+}
+
+// 1秒ごとに更新
+setInterval(fetchOverlay, 1000);
+fetchOverlay();
+</script>
+
+</body>
+</html>
