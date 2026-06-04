@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>MK Sokuzi</title>
+<style>
+body {
+  font-family: sans-serif;
+  margin: 0;
+  padding: 0;
+  background: #f5f5f5;
+}
+
+/* タブ */
+.tab {
+  display: flex;
+  background: #333;
+}
+.tab button {
+  flex: 1;
+  padding: 12px;
+  background: #444;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+.tab button.active {
+  background: #666;
+}
+
+/* セクション */
+.section {
+  padding: 20px;
+  background: white;
+  margin: 10px;
+  border-radius: 10px;
+}
+
+/* ラウンド入力 */
+.roundBox {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+.roundBox select, .roundBox input {
+  padding: 6px;
+}
+
+/* スコアテーブル */
+#scoreTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+#scoreTable th, #scoreTable td {
+  border: 1px solid #ccc;
+  padding: 6px;
+  text-align: center;
+}
+
+/* リザルト画像 */
+#resultImageLocal {
+  max-width: 100%;
+  border: 1px solid #ccc;
+  border-radius: 10px;
+}
+</style>
+</head>
+
+<body>
+
+<!-- ▼ タブ -->
+<div class="tab">
+  <button class="active" onclick="openTab('inputTab')">入力</button>
+  <button onclick="openTab('historyTab')">履歴</button>
+  <button onclick="openTab('jsonTab')">JSON</button>
+  <button onclick="openTab('p2pTab')">P2P</button>
+</div>
+
+<!-- ▼ 入力タブ -->
+<div id="inputTab" class="section">
+
+  <h2>チーム設定</h2>
+  <input id="teamInput" placeholder="A,B,C,D">
+  <button onclick="setTeams()">設定</button>
+
+  <h2>コース設定</h2>
+  <input id="courseInput" placeholder="コース名をカンマ区切りで">
+  <button onclick="setCourses()">設定</button>
+
+  <h2>ラウンド入力</h2>
+  <div id="roundContainer"></div>
+
+  <h2>ペナルティ</h2>
+  <input id="penaltyInput" type="number" value="0">
+  <button onclick="applyPenalty()">適用</button>
+
+  <h2>スコア</h2>
+  <table id="scoreTable"></table>
+
+  <h2>リザルト背景画像</h2>
+  <input type="file" id="resultBgInput" accept="image/*">
+  <p>※ 設定されていない場合はデフォルト赤背景</p>
+
+  <h2>Webhook（複数登録 → 1つ選択）</h2>
+  <input id="webhookInput" placeholder="https://discord.com/api/webhooks/...">
+  <button onclick="addWebhook()">追加</button>
+  <div id="webhookList" style="margin-top:10px;"></div>
+
+  <h2>OBS Overlay</h2>
+  <button onclick="openOverlay()">overlay.html を開く</button>
+
+  <h2>リザルト画像</h2>
+  <div id="resultImageArea" style="display:none;">
+    <img id="resultImageLocal">
+    <br>
+    <button onclick="downloadResultImage()">画像を保存</button>
+  </div>
+
+</div>
+
+<!-- ▼ 履歴タブ -->
+<div id="historyTab" class="section" style="display:none;">
+  <h2>履歴</h2>
+  <div id="historyList"></div>
+</div>
+
+<!-- ▼ JSON タブ -->
+<div id="jsonTab" class="section" style="display:none;">
+  <h2>JSON</h2>
+  <button onclick="exportJSON()">エクスポート</button>
+  <button onclick="importJSON()">インポート</button>
+  <textarea id="jsonArea" style="width:100%;height:300px;"></textarea>
+</div>
+
+<!-- ▼ P2P タブ -->
+<div id="p2pTab" class="section" style="display:none;">
+  <h2>P2P 同期</h2>
+  <button onclick="startP2P()">開始</button>
+  <div id="p2pStatus"></div>
+</div>
+
+<script src="main.js"></script>
+</body>
+</html>
