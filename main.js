@@ -10,19 +10,18 @@ const state = {
   myTeam: "チーム1",
   enemyTeams: ["チーム2","チーム3","チーム4"],
 
-  courseList: [
-    // ここにコース名一覧を入れる
-  ],
+  courseList: [ /* 省略 */ ],
 
   teamSizeMap: {},
-  teamRanks: {},                 // teamRanks[team][round] = [rank, ...]
+  teamRanks: {},
   courseNames: Array(totalRounds).fill(""),
   penalty: {},
   currentRound: 0,
-  timestamp: null,               // 保存用タイムスタンプ
-  _history: []                   // 履歴キャッシュ
-};
+  timestamp: null,
 
+  /* ★ ここに追加 */
+  backgroundImage: null
+};
 
 /* ============================================================
    IndexedDB（history）
@@ -51,15 +50,19 @@ async function saveHistoryRecord() {
   state.timestamp = ts;
 
   const record = {
-    id: ts,
-    timestamp: ts,
-    teams: state.teams,
-    myTeam: state.myTeam,
-    enemyTeams: state.enemyTeams,
-    courses: state.courseNames,
-    teamRanks: state.teamRanks,
-    penalty: state.penalty
-  };
+     id: ts,
+     timestamp: ts,
+     teams: state.teams,
+     myTeam: state.myTeam,
+     enemyTeams: state.enemyTeams,
+     courses: state.courseNames,
+     teamRanks: state.teamRanks,
+     penalty: state.penalty,
+   
+     /* ★ ここに追加 */
+     backgroundImage: state.backgroundImage
+   };
+
 
   const allReq = store.getAll();
   allReq.onsuccess = () => {
@@ -518,6 +521,16 @@ function resetRanks() {
   sendOverlay();
 }
 
+function loadBackgroundImage(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    state.backgroundImage = reader.result;  // base64
+    alert("背景画像を読み込みました");
+  };
+  reader.readAsDataURL(file);
+}
+
 
 
 /* ============================================================
@@ -685,11 +698,13 @@ function exportJSON() {
     enemyTeams: state.enemyTeams,
     courses: state.courseNames,
     teamRanks: state.teamRanks,
-    penalty: state.penalty
+    penalty: state.penalty,
+
+    /* ★ ここに追加 */
+    backgroundImage: state.backgroundImage
   };
 
-  const area = document.getElementById("jsonArea");
-  if (area) area.value = JSON.stringify(data, null, 2);
+  document.getElementById("jsonArea").value = JSON.stringify(data, null, 2);
 }
 
 function importJSON() {
@@ -729,6 +744,7 @@ function importJSON() {
         state.courseNames = record.courses;
         state.teamRanks   = record.teamRanks;
         state.penalty     = record.penalty || {};
+      　state.backgroundImage = record.backgroundImage || null;
 
         setFormatFromMode(state.mode);
         updateScores();
@@ -897,19 +913,25 @@ function onP2PMessage(ev) {
    リザルト画像生成
 ============================================================ */
 
-function generateResultImage() {
+async function generateResultImage() {
   const canvas = document.getElementById("resultCanvas");
-  if (!canvas) {
-    alert("resultCanvas が見つかりません");
-    return;
-  }
   const ctx = canvas.getContext("2d");
   const w = canvas.width;
   const h = canvas.height;
 
-  ctx.fillStyle = "#20232a";
-  ctx.fillRect(0,0,w,h);
+  // 背景画像がある場合
+  if (state.backgroundImage) {
+    const img = new Image();
+    img.src = state.backgroundImage;
+    await img.decode();
+    ctx.drawImage(img, 0, 0, w, h);
+  } else {
+    // デフォルト背景
+    ctx.fillStyle = "#8b0000"; // 濃い赤
+    ctx.fillRect(0, 0, w, h);
+  }
 
+  // ここから先は既存の描画処理
   ctx.fillStyle = "#fff";
   ctx.font = "28px sans-serif";
   ctx.fillText("MK Result", 20, 40);
@@ -920,8 +942,7 @@ function generateResultImage() {
   ctx.fillText(`自チーム：${state.myTeam}`, 20, 95);
 
   const scores = calculateTeamScores();
-  const ranking = Object.entries(scores)
-    .sort((a,b)=>b[1]-a[1]);
+  const ranking = Object.entries(scores).sort((a,b)=>b[1]-a[1]);
 
   ctx.font = "20px sans-serif";
   ctx.fillText("総合スコア", 20, 130);
@@ -956,6 +977,7 @@ function generateResultImage() {
 
   canvas.style.display = "block";
 }
+
 
 
 /* ============================================================
