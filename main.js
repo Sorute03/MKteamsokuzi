@@ -470,18 +470,16 @@ function confirmRound(round) {
 
   alert(`ラウンド${round+1}を保存しました`);
 
-  // ★ オーバーレイ送信
+  // オーバーレイ送信
   sendOverlay();
 
-  // ★ 途中経過送信（自動）
-  sendInstantScore();
+  // ★ 途中経過送信（静かに）
+  sendInstantScoreSilent();
 
-  // ★ 12R 目ならリザルト画像送信（必要なら）
-  if (round === totalRounds - 1) {
-    // generateResultImage();
-    // sendResultToWebhook(); ← 必要なら後で追加
-  }
+  // 12R 目ならリザルト送信なども可能
 }
+
+
 
 
 
@@ -689,6 +687,44 @@ async function sendInstantScore() {
   });
 
   alert("途中経過を送信しました");
+}
+
+
+async function sendInstantScoreSilent() {
+  if (!webhookList.length || activeWebhookIndex < 0) {
+    return; // 何も言わずに終了
+  }
+
+  const url = webhookList[activeWebhookIndex];
+  const ranking = calcRanking();
+  if (!ranking.length) return;
+
+  const top = ranking[0].score;
+
+  const text =
+    `【即時集計】\n\n` +
+    ranking.map((t, i) => {
+      const diff = t.score - top;
+      return `${i + 1}位：${t.team} ${t.score}点 ${diff === 0 ? "" : `(${diff})`}`;
+    }).join("\n");
+
+  const payload = {
+    username: "MK Sokuzi",
+    embeds: [
+      {
+        title: `📊 現在のスコア（自チーム：${state.myTeam}）`,
+        description: text,
+        color: 3447003,
+        timestamp: new Date().toISOString()
+      }
+    ]
+  };
+
+  await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
 }
 
 
