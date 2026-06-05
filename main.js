@@ -758,9 +758,6 @@ function showTeamProgress() {
    即時集計送信（Webhook）
 ============================================================ */
 
-let webhookList = [];        // 外部で設定される想定
-let activeWebhookIndex = -1; // 外部 UI で選択される想定
-
 async function sendInstantScore() {
   if (!webhookList.length || activeWebhookIndex < 0) {
     alert("Webhook が選択されていません");
