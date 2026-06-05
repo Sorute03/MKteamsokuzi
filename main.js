@@ -2067,21 +2067,29 @@ const OVERLAY_GAS_URL = "https://script.google.com/macros/s/AKfycbzpc671wkm1y3JU
 // ▼ 送信用チャンネルを作成
 const bc = new BroadcastChannel("mk_overlay");
 
+// ▼ overlay.html からの要求を受信
+window.addEventListener("message", (event) => {
+  if (event.data.type === "requestOverlay") {
+    sendOverlay();
+  }
+});
+
+// ▼ overlay.html に途中経過を返す
 function sendOverlay() {
   const payload = {
     type: "overlay",
     timestamp: state.timestamp || Date.now(),
     teams: state.teams,
+    scores: calculateTeamScores(),
     myTeam: state.myTeam,
     enemyTeams: state.enemyTeams,
     courses: state.courseNames,
     teamRanks: state.teamRanks,
-    penalty: state.penalty,
-    scores: calculateTeamScores()
+    penalty: state.penalty
   };
 
-  // ▼ GAS ではなく overlay.html に直接送信
-  bc.postMessage(payload);
+  const iframe = document.getElementById("overlayFrame");
+  iframe.contentWindow.postMessage(payload, "*");
 }
 
 /* ============================================================
