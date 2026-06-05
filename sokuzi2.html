@@ -6,7 +6,23 @@
 
 <style>
 body { margin:0; padding:10px; font-family:sans-serif; }
-#tabs { display:flex; gap:4px; margin-bottom:10px; }
+/* 通常は上にある */
+#tabs {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  background: rgba(0,0,0,0.6);
+  padding: 6px;
+  z-index: 9999;
+}
+
+/* Overlay タブのときだけ下に移動 */
+body.overlay-mode #tabs {
+  top: auto;
+  bottom: 0;
+}
+
 .tabBtn { padding:6px 12px; border:1px solid #ccc; background:#f5f5f5; cursor:pointer; }
 .tabBtn.active { background:#4caf50; color:#fff; }
 .tabContent { margin-top:10px; }
