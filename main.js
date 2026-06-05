@@ -202,6 +202,88 @@ function getUserTimestamp() {
   return d.getTime();
 }
 
+/* ============================================================
+   webhook設定
+============================================================ */
+
+let webhookList = [];
+let activeWebhookIndex = -1;
+
+function loadWebhookSettings() {
+  const saved = localStorage.getItem("mk_webhooks");
+  if (saved) {
+    const obj = JSON.parse(saved);
+    webhookList = obj.list || [];
+    activeWebhookIndex = obj.active ?? -1;
+  }
+  renderWebhookList();
+}
+
+function saveWebhookSettings() {
+  localStorage.setItem("mk_webhooks", JSON.stringify({
+    list: webhookList,
+    active: activeWebhookIndex
+  }));
+}
+
+function addWebhook() {
+  const url = document.getElementById("webhookInput").value.trim();
+  if (!url) return alert("URL を入力してください");
+
+  if (!url.startsWith("https://discord.com/api/webhooks/")) {
+    return alert("Discord Webhook URL の形式ではありません");
+  }
+
+  webhookList.push(url);
+  if (activeWebhookIndex === -1) activeWebhookIndex = 0;
+
+  saveWebhookSettings();
+  renderWebhookList();
+
+  document.getElementById("webhookInput").value = "";
+}
+
+
+function deleteWebhook(index) {
+  webhookList.splice(index, 1);
+
+  if (activeWebhookIndex === index) {
+    activeWebhookIndex = webhookList.length ? 0 : -1;
+  }
+
+  saveWebhookSettings();
+  renderWebhookList();
+}
+
+function selectWebhook(index) {
+  activeWebhookIndex = index;
+  saveWebhookSettings();
+  renderWebhookList();
+}
+
+function renderWebhookList() {
+  const area = document.getElementById("webhookListArea");
+  if (!area) return;
+
+  if (!webhookList.length) {
+    area.innerHTML = "<div>登録された Webhook はありません。</div>";
+    return;
+  }
+
+  let html = "";
+  webhookList.forEach((url, i) => {
+    const active = (i === activeWebhookIndex) ? "style='color:#4caf50;font-weight:bold;'" : "";
+    html += `
+      <div style="margin-bottom:6px;">
+        <span ${active}>${url}</span>
+        <button onclick="selectWebhook(${i})">使用</button>
+        <button onclick="deleteWebhook(${i})">削除</button>
+      </div>
+    `;
+  });
+
+  area.innerHTML = html;
+}
 
 /* ============================================================
    チーム名・モード設定
@@ -1086,4 +1168,5 @@ window.addEventListener("load", () => {
   setFormatFromMode(state.mode);
   setupJSONDropArea();
   loadLocalHistory();
+  loadWebhookSettings();   // ★ 追加
 });
