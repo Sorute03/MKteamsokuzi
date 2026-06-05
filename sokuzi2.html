@@ -34,7 +34,8 @@ body { margin:0; padding:10px; font-family:sans-serif; }
 <!-- タブ -->
 <div id="tabs">
   <button class="tabBtn active" data-tab="inputTab">入力</button>
-  <button class="tabBtn" data-tab="historyTab">戦績</button>
+  <button class="tabBtn" data-tab="analysisTab">戦績</button>
+  <button class="tabBtn" data-tab="historyTab">歴代戦績</button>
   <button class="tabBtn" data-tab="jsonTab">JSON</button>
   <button class="tabBtn" data-tab="p2pTab">P2P</button>
   <button class="tabBtn" data-tab="resultTab">リザルト</button>
@@ -182,6 +183,49 @@ body { margin:0; padding:10px; font-family:sans-serif; }
 
   <h4>登録済み Webhook</h4>
   <div id="webhookListArea"></div>
+
+</div>
+  
+<!-- 戦績タブ -->
+<div id="analysisTab" class="tabContent" style="display:none;">
+
+  <h3>チーム別戦績分析</h3>
+
+  <label>チーム：</label>
+  <select id="analysisTeamSelect" onchange="updateTeamAnalysis()"></select>
+
+  <h4>コース別 勝率 / 平均得点 / 期待値 / 安定度</h4>
+  <table id="tableCourseStats" border="1" cellpadding="6" style="width:100%; background:#fff;"></table>
+
+  <h4 style="margin-top:20px;">相手チーム別 勝率 / 平均得点差</h4>
+  <table id="tableOpponentStats" border="1" cellpadding="6" style="width:100%; background:#fff;"></table>
+
+  <h4 style="margin-top:20px;">コース × 相手チーム 勝率マトリクス</h4>
+  <table id="tableCourseOpponentMatrix" border="1" cellpadding="6" style="width:100%; background:#fff;"></table>
+
+  <h4 style="margin-top:20px;">コース × 相手チーム 得点差マトリクス</h4>
+  <table id="tableCourseOpponentScoreDiffMatrix" border="1" cellpadding="6" style="width:100%; background:#fff;"></table>
+
+  <h4 style="margin-top:20px;">コース別レーダーチャート</h4>
+  <canvas id="chartCourseRadar" width="400" height="400"></canvas>
+
+  <h4 style="margin-top:20px;">相手チーム別レーダーチャート</h4>
+  <canvas id="chartOpponentRadar" width="400" height="400"></canvas>
+
+  <h4 style="margin-top:20px;">コース × 相手チーム ヒートマップ</h4>
+  <canvas id="chartCourseOpponentHeatmap" width="600" height="600"></canvas>
+
+  <h4 style="margin-top:20px;">コース得意 TOP10</h4>
+  <table id="tableStrongCourses" border="1" cellpadding="6" style="width:100%; background:#fff;"></table>
+
+  <h4 style="margin-top:20px;">コース苦手 TOP10</h4>
+  <table id="tableWeakCourses" border="1" cellpadding="6" style="width:100%; background:#fff;"></table>
+
+  <h4 style="margin-top:20px;">安定度 TOP10（標準偏差が小さい）</h4>
+  <table id="tableStableCourses" border="1" cellpadding="6" style="width:100%; background:#fff;"></table>
+
+  <h4 style="margin-top:20px;">不安定 TOP10（標準偏差が大きい）</h4>
+  <table id="tableUnstableCourses" border="1" cellpadding="6" style="width:100%; background:#fff;"></table>
 
 </div>
 
