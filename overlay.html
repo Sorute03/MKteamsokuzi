@@ -45,7 +45,7 @@ setTimeout(() => {
 window.addEventListener("message", (event) => {
   const data = event.data;
   if (!data || data.type !== "overlay") return;
-
+  console.log("受信したpayload:", data);
   updateOverlayUI(data);
 });
 
