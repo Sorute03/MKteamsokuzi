@@ -982,7 +982,8 @@ function importJSON() {
       enemyTeams: data.enemyTeams,
       courses: data.courses,
       teamRanks: data.teamRanks,
-      penalty: data.penalty
+      penalty: data.penalty,
+      backgroundImage: data.backgroundImage || null
     };
 
     openDB().then(db => {
@@ -998,6 +999,7 @@ function importJSON() {
           return;
         }
 
+        // ★ state に反映
         state.timestamp   = record.timestamp;
         state.teams       = record.teams;
         state.myTeam      = record.myTeam;
@@ -1005,10 +1007,20 @@ function importJSON() {
         state.courseNames = record.courses;
         state.teamRanks   = record.teamRanks;
         state.penalty     = record.penalty || {};
-      　state.backgroundImage = record.backgroundImage || null;
+        state.backgroundImage = record.backgroundImage || null;
 
         setFormatFromMode(state.mode);
         updateScores();
+
+        // ★ IndexedDB に保存（ここが追加）
+        const tx2 = db.transaction("history", "readwrite");
+        const store2 = tx2.objectStore("history");
+        store2.put({
+          id: record.timestamp,
+          ...record
+        });
+
+        alert("JSON を読み込み、履歴に保存しました");
       };
     });
 
@@ -1016,6 +1028,7 @@ function importJSON() {
     alert("JSON の形式が正しくありません");
   }
 }
+
 
 function downloadJSONFile() {
   const ts = getUserTimestamp();
@@ -1106,6 +1119,20 @@ function downloadTeamJSONFile(teamName) {
   URL.revokeObjectURL(url);
 }
 
+function applyReceivedState(record) {
+  state.timestamp   = record.timestamp;
+  state.teams       = record.teams;
+  state.myTeam      = record.myTeam;
+  state.enemyTeams  = record.enemyTeams;
+  state.courseNames = record.courses;
+  state.teamRanks   = record.teamRanks;
+  state.penalty     = record.penalty || {};
+  state.backgroundImage = record.backgroundImage || null;
+
+  updateUIFromState();
+}
+
+
 /* ============================================================
    P2P（簡易版：BroadcastChannel）
 ============================================================ */
@@ -1148,6 +1175,27 @@ function onP2PMessage(ev) {
   if (!msg || msg.type !== "state") return;
 
   const p = msg.payload;
+
+  // ★ IndexedDB に保存（受信データをそのまま記録）
+  openDB().then(db => {
+    const tx = db.transaction("history", "readwrite");
+    const store = tx.objectStore("history");
+
+    store.put({
+      id: p.timestamp,
+      timestamp: p.timestamp,
+      teams: p.teams,
+      myTeam: p.myTeam,
+      enemyTeams: p.enemyTeams,
+      courses: p.courses,
+      teamRanks: p.teamRanks,
+      penalty: p.penalty || {},
+      backgroundImage: p.backgroundImage || null,
+      source: "p2p"   // ★ どこから来たか識別したい場合
+    });
+  });
+
+  // ★ state に反映（既存処理）
   state.timestamp   = p.timestamp;
   state.teams       = p.teams;
   state.myTeam      = p.myTeam;
@@ -1155,6 +1203,7 @@ function onP2PMessage(ev) {
   state.courseNames = p.courses;
   state.teamRanks   = p.teamRanks;
   state.penalty     = p.penalty || {};
+  state.backgroundImage = p.backgroundImage || null;
 
   setFormatFromMode(state.mode);
   updateScores();
@@ -1162,6 +1211,7 @@ function onP2PMessage(ev) {
   const status = document.getElementById("p2pStatus");
   if (status) status.textContent = "P2P でデータを受信しました";
 }
+
 
 
 /* ============================================================
