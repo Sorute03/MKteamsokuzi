@@ -146,12 +146,11 @@ function calcScoresFromRecord(rec) {
 
 function isFullDataDuplicate(record, existingList) {
   return existingList.some(existing => {
-    // A. タイムスタンプ & 自チーム名一致
-    if (existing.timestamp && record.timestamp) {
-      if (existing.timestamp === record.timestamp &&
-          existing.myTeam === record.myTeam) {
-        return true;
-      }
+
+    // A. timestamp & myTeam が一致
+    if (existing.timestamp === record.timestamp &&
+        existing.myTeam === record.myTeam) {
+      return true;
     }
 
     // B. 全データ完全一致
@@ -161,6 +160,15 @@ function isFullDataDuplicate(record, existingList) {
 
     if (sameTeams && sameCourses && sameRanks) {
       return true;
+    }
+
+    // C. 特定チームモードの部分一致
+    if (record.teams.length === 1) {
+      const t = record.teams[0];
+      if (existing.teamRanks[t] &&
+          JSON.stringify(existing.teamRanks[t]) === JSON.stringify(record.teamRanks[t])) {
+        return true;
+      }
     }
 
     return false;
@@ -1176,40 +1184,59 @@ function onP2PMessage(ev) {
 
   const p = msg.payload;
 
-  // ★ IndexedDB に保存（受信データをそのまま記録）
+  const record = {
+    timestamp: p.timestamp,
+    teams: p.teams,
+    myTeam: p.myTeam,
+    enemyTeams: p.enemyTeams,
+    courses: p.courses,
+    teamRanks: p.teamRanks,
+    penalty: p.penalty || {},
+    backgroundImage: p.backgroundImage || null
+  };
+
+  // ★ IndexedDB を開く
   openDB().then(db => {
-    const tx = db.transaction("history", "readwrite");
+    const tx = db.transaction("history", "readonly");
     const store = tx.objectStore("history");
+    const req = store.getAll();
 
-    store.put({
-      id: p.timestamp,
-      timestamp: p.timestamp,
-      teams: p.teams,
-      myTeam: p.myTeam,
-      enemyTeams: p.enemyTeams,
-      courses: p.courses,
-      teamRanks: p.teamRanks,
-      penalty: p.penalty || {},
-      backgroundImage: p.backgroundImage || null,
-      source: "p2p"   // ★ どこから来たか識別したい場合
-    });
+    req.onsuccess = () => {
+      const existing = req.result || [];
+
+      // ★ 重複チェック
+      if (isFullDataDuplicate(record, existing)) {
+        const status = document.getElementById("p2pStatus");
+        if (status) status.textContent = "P2P 受信データは既存データと重複しているため無視しました";
+        return;
+      }
+
+      // ★ IndexedDB に保存
+      const tx2 = db.transaction("history", "readwrite");
+      const store2 = tx2.objectStore("history");
+      store2.put({
+        id: record.timestamp,
+        ...record,
+        source: "p2p"
+      });
+
+      // ★ state に反映
+      state.timestamp   = record.timestamp;
+      state.teams       = record.teams;
+      state.myTeam      = record.myTeam;
+      state.enemyTeams  = record.enemyTeams;
+      state.courseNames = record.courses;
+      state.teamRanks   = record.teamRanks;
+      state.penalty     = record.penalty;
+      state.backgroundImage = record.backgroundImage;
+
+      setFormatFromMode(state.mode);
+      updateScores();
+
+      const status = document.getElementById("p2pStatus");
+      if (status) status.textContent = "P2P でデータを受信しました（保存済み）";
+    };
   });
-
-  // ★ state に反映（既存処理）
-  state.timestamp   = p.timestamp;
-  state.teams       = p.teams;
-  state.myTeam      = p.myTeam;
-  state.enemyTeams  = p.enemyTeams;
-  state.courseNames = p.courses;
-  state.teamRanks   = p.teamRanks;
-  state.penalty     = p.penalty || {};
-  state.backgroundImage = p.backgroundImage || null;
-
-  setFormatFromMode(state.mode);
-  updateScores();
-
-  const status = document.getElementById("p2pStatus");
-  if (status) status.textContent = "P2P でデータを受信しました";
 }
 
 
