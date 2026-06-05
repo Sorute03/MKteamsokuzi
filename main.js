@@ -470,8 +470,17 @@ function confirmRound(round) {
 
   alert(`ラウンド${round+1}を保存しました`);
 
-  // ★ 追加：オーバーレイへ送信
+  // ★ オーバーレイ送信
   sendOverlay();
+
+  // ★ 途中経過送信（自動）
+  sendInstantScore();
+
+  // ★ 12R 目ならリザルト画像送信（必要なら）
+  if (round === totalRounds - 1) {
+    // generateResultImage();
+    // sendResultToWebhook(); ← 必要なら後で追加
+  }
 }
 
 
