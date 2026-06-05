@@ -150,9 +150,11 @@ body { margin:0; padding:10px; font-family:sans-serif; }
   <h3>Webhook URL 設定</h3>
 
   <div style="margin-bottom:10px;">
-    <input id="webhookInput" placeholder="https://discord.com/api/webhooks/..." style="width:80%;">
+    <input id="webhookNameInput" placeholder="名前（例：メモ用）" style="width:30%;">
+    <input id="webhookInput" placeholder="https://discord.com/api/webhooks/..." style="width:50%;">
     <button onclick="addWebhook()">追加</button>
   </div>
+
 
   <h4>登録済み Webhook</h4>
   <div id="webhookListArea"></div>
