@@ -2,67 +2,63 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>MK Overlay</title>
 <style>
 body {
-  margin:0;
-  padding:10px;
-  background:#000;
-  color:#fff;
-  font-family:sans-serif;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  height: 100vh;
 }
+
+#overlay {
+  background-color: rgba(0,0,0,0.5);
+  color: white;
+  padding: 12px;
+  font-size: 24px;
+  border-radius: 8px;
+  font-family: sans-serif;
+  display: flex;
+  gap: 20px;
+  justify-content: center;
+  align-items: center;
+}
+
 .team {
-  font-size:24px;
-  margin:4px 0;
-}
-.my {
-  color:#4caf50;
-  font-weight:bold;
+  white-space: nowrap;
 }
 </style>
 </head>
 <body>
 
-<div id="overlay"></div>
+<div id="overlay">待機中...</div>
 
 <script>
-const GAS_URL = "https://script.google.com/macros/s/XXXX/exec"; // ← あなたの GAS URL
+const bc = new BroadcastChannel("mk_overlay");
 
-async function fetchOverlay() {
-  try {
-    const res = await fetch(GAS_URL + "?type=overlay");
-    const data = await res.json();
-    renderOverlay(data);
-  } catch (e) {
-    console.warn("overlay fetch error:", e);
+bc.onmessage = (event) => {
+  const data = event.data;
+  if (data.type !== "overlay") return;
+
+  // ▼ GAS と同じ並び順にソート（score 降順）
+  const teams = data.teams.map((t, i) => ({
+    name: t,
+    score: data.scores[i] ?? 0
+  })).sort((a, b) => b.score - a.score);
+
+  // ▼ GAS と同じ HTML を生成
+  let html = "<div style='display:flex; gap:20px; justify-content:center; align-items:center;'>";
+
+  for (let i = 0; i < teams.length; i++) {
+    html += `<span class="team">${i+1}位 ${teams[i].name}：${teams[i].score}点</span>`;
   }
-}
 
-function renderOverlay(data) {
-  const div = document.getElementById("overlay");
-  if (!data || !data.scores) {
-    div.innerHTML = "<div>waiting...</div>";
-    return;
-  }
+  html += "</div>";
 
-  const ranking = Object.entries(data.scores)
-    .sort((a,b)=>b[1]-a[1]);
-
-  const top = ranking[0][1];
-
-  let html = "";
-  ranking.forEach(([team,score])=>{
-    const diff = score - top;
-    const cls = (team === data.myTeam) ? "team my" : "team";
-    html += `<div class="${cls}">${team} ${score} (${diff>=0?diff:""})</div>`;
-  });
-
-  div.innerHTML = html;
-}
-
-// 1秒ごとに更新
-setInterval(fetchOverlay, 1000);
-fetchOverlay();
+  document.getElementById("overlay").innerHTML = html;
+};
 </script>
 
 </body>
