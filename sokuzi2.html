@@ -30,6 +30,18 @@ body { margin:0; padding:10px; font-family:sans-serif; }
 </style>
 </head>
 <body>
+<!-- ▼ OBS に表示する overlay.html（最前面） -->
+<iframe id="overlayFrame" src="overlay.html"
+        style="
+          position:fixed;
+          left:0; top:0;
+          width:100vw; height:100vh;
+          border:none;
+          pointer-events:none;   /* ← 入力UIを触れるようにする */
+          z-index:99999;
+        ">
+</iframe>
+
 
 <!-- タブ -->
 <div id="tabs">
@@ -257,7 +269,6 @@ body { margin:0; padding:10px; font-family:sans-serif; }
 <button onclick="sendInstantScoreMulti(false)">途中経過を送信</button>
 
 <div id="aggregateArea" style="margin-top:20px;"></div>
-<iframe name="hiddenFrame" style="display:none;"></iframe>
 
 
 <script src="main.js"></script>
