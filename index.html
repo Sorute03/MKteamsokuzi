@@ -1,555 +1,287 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html>
 <head>
 <meta charset="UTF-8">
-<title>MK Sokuzi</title>
+<title>MKteamsokuzi</title>
+
 <style>
-body {
-  font-family: sans-serif;
-  margin: 0;
-  padding: 0;
-  background: #f5f5f5;
+body { margin:0; padding:10px; font-family:sans-serif; }
+#tabs { display:flex; gap:4px; margin-bottom:10px; }
+.tabBtn { padding:6px 12px; border:1px solid #ccc; background:#f5f5f5; cursor:pointer; }
+.tabBtn.active { background:#4caf50; color:#fff; }
+.tabContent { margin-top:10px; }
+.team-section { margin-bottom:20px; }
+.rank-buttons { display:flex; flex-wrap:wrap; gap:4px; }
+.rank-button {
+  width:32px; height:32px; text-align:center; line-height:32px;
+  border:1px solid #ccc; cursor:pointer; border-radius:4px; font-size:12px;
 }
-
-/* タブ */
-.tab {
-  display: flex;
-  background: #333;
+.rank-button.selected { background:#4caf50; color:white; }
+#penaltyModal {
+  display:none; position:fixed; top:50%; left:50%;
+  transform:translate(-50%,-50%); background:white;
+  padding:20px; border:2px solid #333; border-radius:10px; z-index:9999;
 }
-.tab button {
-  flex: 1;
-  padding: 12px;
-  background: #444;
-  color: white;
-  border: none;
-  cursor: pointer;
-}
-.tab button.active {
-  background: #666;
-}
-
-/* セクション */
-.section {
-  padding: 20px;
-  background: white;
-  margin: 10px;
-  border-radius: 10px;
-}
-
-/* ラウンド入力 */
-.roundBox {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-.roundBox select, .roundBox input {
-  padding: 6px;
-}
-
-/* スコアテーブル */
-#scoreTable {
-  width: 100%;
-  border-collapse: collapse;
-}
-#scoreTable th, #scoreTable td {
-  border: 1px solid #ccc;
-  padding: 6px;
-  text-align: center;
-}
-
-/* リザルト画像 */
-#resultImageLocal {
-  max-width: 100%;
-  border: 1px solid #ccc;
-  border-radius: 10px;
+.record { border:1px solid #ccc; padding:6px; margin:4px 0; font-size:12px; }
+#jsonDropArea {
+  width:100%; height:120px; border:2px dashed #888; border-radius:10px;
+  display:flex; align-items:center; justify-content:center; background:#fafafa;
 }
 </style>
 </head>
-
 <body>
 
-<!-- ▼ タブ -->
-<div class="tab">
-  <button class="active" onclick="openTab('inputTab')">入力</button>
-  <button onclick="openTab('historyTab')">履歴</button>
-  <button onclick="openTab('jsonTab')">JSON</button>
-  <button onclick="openTab('p2pTab')">P2P</button>
+
+
+<!-- タブ -->
+<div id="tabs">
+  <button class="tabBtn active" data-tab="inputTab">入力</button>
+  <button class="tabBtn" data-tab="analysisTab">戦績</button>
+  <button class="tabBtn" data-tab="historyTab">歴代戦績</button>
+  <button class="tabBtn" data-tab="jsonTab">JSON</button>
+  <button class="tabBtn" data-tab="p2pTab">P2P</button>
+  <button class="tabBtn" data-tab="resultTab">リザルト</button>
+  <button class="tabBtn" data-tab="webhookTab">Webhook</button>
+  <button class="tabBtn" data-tab="overlayTab">Overlay</button>
 </div>
 
-<!-- ▼ 入力タブ -->
-<div id="inputTab" class="section">
+<div id="overlayTab" class="tabContent" style="display:none; position:relative; height:600px;">
 
-  <h2>チーム設定</h2>
-  <input id="teamInput" placeholder="A,B,C,D">
-  <button onclick="setTeams()">設定</button>
+  <iframe id="overlayFrame"
+          src="https://sorute03.github.io/MKteamsokuzi/overlay.html"
+          style="
+            position:absolute;
+            top:50%;
+            left:50%;
+            transform:translate(-50%, -50%);
+            width:800px;
+            height:450px;
+            border:none;
+            z-index:10;
+          ">
+  </iframe>
 
-  <h2>コース設定</h2>
-  <input id="courseInput" placeholder="コース名をカンマ区切りで">
-  <button onclick="setCourses()">設定</button>
+</div>
 
-  <h2>ラウンド入力</h2>
-  <div id="roundContainer"></div>
+<!-- 入力タブ -->
+<div id="inputTab" class="tabContent" style="display:block;">
 
-  <h2>ペナルティ</h2>
-  <input id="penaltyInput" type="number" value="0">
-  <button onclick="applyPenalty()">適用</button>
+  <h3>モード設定</h3>
+  <div>
+    <label>モード：</label>
+    <select id="modeSelect" onchange="setFormatFromMode(this.value)">
+      <option value="3v3">3v3</option>
+      <option value="4v4">4v4</option>
+      <option value="6v6" selected>6v6</option>
+      <option value="8v8">8v8</option>
+      <option value="12v12">12v12</option>
+    </select>
+  </div>
 
-  <h2>スコア</h2>
-  <table id="scoreTable"></table>
+  <h3>チーム設定</h3>
+  <div>
+    <label>チーム数：</label>
+    <select id="teamCountSelect" onchange="createEnemyTeamEditor()">
+      <option value="2">2チーム</option>
+      <option value="3">3チーム</option>
+      <option value="4" selected>4チーム</option>
+      <option value="5">5チーム</option>
+      <option value="6">6チーム</option>
+    </select>
+  </div>
+  <br>
+  <div>
+    <label>自チーム：</label>
+    <input id="myTeamInput" value="チーム1">
+  </div>
+  <br>
+  <div id="enemyTeamEditor"></div>
+  <button onclick="applyTeamNames()">チーム名を適用</button>
 
-  <h2>リザルト背景画像</h2>
-  <input type="file" id="resultBgInput" accept="image/*">
-  <p>※ 設定されていない場合はデフォルト赤背景</p>
+  <hr>
 
-  <h2>Webhook（複数登録 → 1つ選択）</h2>
-  <input id="webhookInput" placeholder="https://discord.com/api/webhooks/...">
-  <button onclick="addWebhook()">追加</button>
-  <div id="webhookList" style="margin-top:10px;"></div>
+  <h3>コース選択</h3>
+  <div id="course-container"></div>
 
-  <h2>OBS Overlay</h2>
-  <button onclick="openOverlay()">overlay.html を開く</button>
+  <div class="button-bar" style="margin-top:10px;">
+    <button onclick="resetRanks()">リセット</button>
+    <button onclick="openPenaltyTeamSelect()">ペナルティ</button>
+    <button onclick="saveHistoryRecord()">この試合をローカル保存</button>
+    <button onclick="sendHistoryToGAS()">この試合を共有保存</button>
+  </div>
 
-  <h2>リザルト画像</h2>
-  <div id="resultImageArea" style="display:none;">
-    <img id="resultImageLocal">
-    <br>
-    <button onclick="downloadResultImage()">画像を保存</button>
+  <div id="teams-container" style="margin-top:10px;"></div>
+
+  <h3>スコア</h3>
+  <table id="scoreTable" border="1">
+    <thead><tr><th>順位</th><th>チーム</th><th>スコア</th></tr></thead>
+    <tbody></tbody>
+  </table>
+
+  <h3>タイムスタンプ</h3>
+  <input id="timestampInput" placeholder="例: 2026/6/3 21（空欄なら自動）" style="width:200px;">
+
+  <!-- ペナルティ用モーダル -->
+  <div id="penaltyModal">
+    <h3>ペナルティ対象チームを選択</h3>
+    <div id="penaltyTeamButtons"></div>
+    <button onclick="closePenaltyModal()">閉じる</button>
   </div>
 
 </div>
 
-<!-- ▼ 履歴タブ -->
-<div id="historyTab" class="section" style="display:none;">
-  <h2>履歴</h2>
-  <div id="historyList"></div>
+<!-- 戦績タブ -->
+<div id="historyTab" class="tabContent" style="display:none;">
+  <h3>個人戦績（IndexedDB）</h3>
+  <div id="localHistory"></div>
 </div>
 
-<!-- ▼ JSON タブ -->
-<div id="jsonTab" class="section" style="display:none;">
-  <h2>JSON</h2>
-  <button onclick="exportJSON()">エクスポート</button>
-  <button onclick="importJSON()">インポート</button>
-  <textarea id="jsonArea" style="width:100%;height:300px;"></textarea>
+<!-- JSON タブ -->
+<div id="jsonTab" class="tabContent" style="display:none;">
+
+  <h3>JSON 操作</h3>
+  <button onclick="exportJSON()">JSON を表示</button>
+  <button onclick="downloadJSONFile()">JSON を保存</button>
+  <input type="file" id="jsonFileInput" accept="application/json" onchange="uploadJSONFile(this.files[0])">
+
+  <h3>JSON 共有モード</h3>
+  <select id="jsonShareModeSelect" onchange="updateJsonShareMode()">
+    <option value="all">全データ共有</option>
+    <option value="team">特定チームのみ</option>
+  </select>
+
+  <div id="jsonShareTeamArea" style="display:none; margin-top:6px;">
+    <label>チーム選択：</label>
+    <select id="jsonShareTeamSelect"></select>
+  </div>
+
+  <h4>特定チーム JSON（旧 UI）</h4>
+  <input id="teamJsonInput" placeholder="チーム名">
+  <button onclick="downloadTeamJSONFile(document.getElementById('teamJsonInput').value)">保存</button>
+
+  <h4>JSON 読み込み（ドラッグ＆ドロップ）</h4>
+  <div id="jsonDropArea">ここに JSON ファイルをドロップ</div>
+
+  <textarea id="jsonArea" style="width:100%;height:200px;margin-top:10px;"></textarea>
+
 </div>
 
-<!-- ▼ P2P タブ -->
-<div id="p2pTab" class="section" style="display:none;">
-  <h2>P2P 同期</h2>
-  <button onclick="startP2P()">開始</button>
-  <div id="p2pStatus"></div>
+
+<!-- P2P タブ -->
+<div id="p2pTab" class="tabContent" style="display:none;">
+
+  <h3>P2P 共有</h3>
+  <button onclick="startP2PHost()">ホスト開始</button>
+  <button onclick="startP2PClient()">クライアント接続</button>
+
+  <h3>P2P 共有モード</h3>
+  <select id="p2pShareModeSelect" onchange="updateP2pShareMode()">
+    <option value="all">全データ共有</option>
+    <option value="team">特定チームのみ</option>
+  </select>
+
+  <div id="p2pShareTeamArea" style="display:none; margin-top:6px;">
+    <label>チーム選択：</label>
+    <select id="p2pShareTeamSelect"></select>
+  </div>
+
+  <div id="p2pStatus" style="margin-top:10px;"></div>
+
 </div>
 
-<script>
-/* ============================================================
-   状態管理
-============================================================ */
-let state = {
-  teams: [],
-  courses: [],
-  teamRanks: {},   // round → { team: rank }
-  penalty: 0
-};
-
-/* ============================================================
-   タブ切り替え
-============================================================ */
-function openTab(id) {
-  document.querySelectorAll(".section").forEach(sec => sec.style.display = "none");
-  document.getElementById(id).style.display = "block";
-
-  document.querySelectorAll(".tab button").forEach(btn => btn.classList.remove("active"));
-  event.target.classList.add("active");
-}
-
-/* ============================================================
-   チーム設定
-============================================================ */
-function setTeams() {
-  const input = document.getElementById("teamInput").value.trim();
-  if (!input) return alert("チーム名を入力してください");
-
-  state.teams = input.split(",").map(t => t.trim());
-  renderRounds();
-  renderScoreTable();
-}
-
-/* ============================================================
-   コース設定
-============================================================ */
-function setCourses() {
-  const input = document.getElementById("courseInput").value.trim();
-  if (!input) return alert("コース名を入力してください");
-
-  state.courses = input.split(",").map(t => t.trim());
-  renderRounds();
-}
-
-/* ============================================================
-   ラウンド UI
-============================================================ */
-function renderRounds() {
-  const box = document.getElementById("roundContainer");
-  box.innerHTML = "";
-
-  for (let r = 0; r < 12; r++) {
-    const div = document.createElement("div");
-    div.className = "roundBox";
-
-    const course = document.createElement("select");
-    course.innerHTML = state.courses.map(c => `<option>${c}</option>`).join("");
-
-    const teamSelects = state.teams.map(team => {
-      return `<select id="r${r}_${team}">
-                ${state.teams.map((_, i) => `<option>${i + 1}</option>`).join("")}
-              </select>`;
-    }).join("");
-
-    div.innerHTML = `
-      <strong>${r + 1}R</strong>
-      ${teamSelects}
-      <button onclick="confirmRound(${r})">確定</button>
-    `;
-
-    box.appendChild(div);
-  }
-}
-
-/* ============================================================
-   ラウンド確定
-============================================================ */
-function confirmRound(round) {
-  const ranks = {};
-  state.teams.forEach(team => {
-    const sel = document.getElementById(`r${round}_${team}`);
-    ranks[team] = Number(sel.value);
-  });
-
-  state.teamRanks[round] = ranks;
-
-  renderScoreTable();
-  sendOverlayToGAS();
-  sendCurrentScoreEmbedToSelected(round);
-  checkIfSetFinished();
-}
-
-/* ============================================================
-   スコア計算
-============================================================ */
-function calcScores() {
-  const scores = {};
-  state.teams.forEach(t => scores[t] = 0);
-
-  for (let r = 0; r < 12; r++) {
-    if (!state.teamRanks[r]) continue;
-    for (const team in state.teamRanks[r]) {
-      const rank = state.teamRanks[r][team];
-      scores[team] += (25 - rank);
-    }
-  }
-
-  scores[state.teams[0]] += state.penalty;
-  return scores;
-}
-
-/* ============================================================
-   スコアテーブル描画
-============================================================ */
-function renderScoreTable() {
-  const table = document.getElementById("scoreTable");
-  const scores = calcScores();
-
-  let html = "<tr><th>チーム</th><th>スコア</th></tr>";
-  state.teams.forEach(t => {
-    html += `<tr><td>${t}</td><td>${scores[t]}</td></tr>`;
-  });
-
-  table.innerHTML = html;
-}
-
-/* ============================================================
-   ペナルティ
-============================================================ */
-function applyPenalty() {
-  state.penalty = Number(document.getElementById("penaltyInput").value);
-  renderScoreTable();
-}
-
-/* ============================================================
-   GAS overlay 送信
-============================================================ */
-const GAS_URL = "YOUR_GAS_URL_HERE";
-
-async function sendOverlayToGAS() {
-  await fetch(GAS_URL, {
-    method: "POST",
-    body: JSON.stringify({
-      type: "overlay",
-      teams: state.teams,
-      teamRanks: state.teamRanks
-    })
-  });
-}
-
-async function resetOverlayOnGAS() {
-  await fetch(GAS_URL, {
-    method: "POST",
-    body: JSON.stringify({ type: "reset" })
-  });
-}
-
-/* ============================================================
-   Webhook（複数登録 → 1つ選択）
-============================================================ */
-let webhookList = JSON.parse(localStorage.getItem("webhookList") || "[]");
-let activeWebhookIndex = Number(localStorage.getItem("activeWebhookIndex") || -1);
-
-function saveWebhookList() {
-  localStorage.setItem("webhookList", JSON.stringify(webhookList));
-  localStorage.setItem("activeWebhookIndex", activeWebhookIndex);
-  renderWebhookList();
-}
-
-function addWebhook() {
-  const url = document.getElementById("webhookInput").value.trim();
-  if (!url) return alert("Webhook URL を入力してください");
-
-  webhookList.push(url);
-  activeWebhookIndex = webhookList.length - 1;
-  saveWebhookList();
-
-  document.getElementById("webhookInput").value = "";
-}
-
-function selectWebhook(i) {
-  activeWebhookIndex = i;
-  saveWebhookList();
-}
-
-function removeWebhook(i) {
-  webhookList.splice(i, 1);
-  if (activeWebhookIndex === i) activeWebhookIndex = -1;
-  if (activeWebhookIndex > i) activeWebhookIndex--;
-  saveWebhookList();
-}
-
-function renderWebhookList() {
-  const box = document.getElementById("webhookList");
-  box.innerHTML = "";
-
-  webhookList.forEach((url, i) => {
-    const div = document.createElement("div");
-    div.innerHTML = `
-      <input type="radio" name="webhookSelect"
-             ${activeWebhookIndex === i ? "checked" : ""}
-             onclick="selectWebhook(${i})">
-      <span>${url}</span>
-      <button onclick="removeWebhook(${i})">削除</button>
-    `;
-    box.appendChild(div);
-  });
-}
-renderWebhookList();
-
-/* ============================================================
-   途中経過（順位表）を選択された Webhook に送信
-============================================================ */
-async function sendCurrentScoreEmbedToSelected(round) {
-  if (activeWebhookIndex < 0) return;
-
-  const url = webhookList[activeWebhookIndex];
-  const scores = calcScores();
-
-  const ranking = [...state.teams]
-    .map(name => ({ name, score: scores[name] }))
-    .sort((a, b) => b.score - a.score);
-
-  const topScore = ranking[0].score;
-
-  const text =
-    `【${round + 1}ラウンド終了】\n\n` +
-    ranking
-      .map((t, i) => {
-        if (i === 0) return `1位：${t.name} ${t.score}点`;
-        const diff = t.score - topScore;
-        return `${i + 1}位：${t.name} ${t.score}点 (${diff})`;
-      })
-      .join("\n");
-
-  const payload = {
-    username: "MK Sokuzi",
-    embeds: [
-      {
-        title: "📊 現在のスコア & 順位（累計）",
-        description: text,
-        color: 3447003,
-        timestamp: new Date().toISOString()
-      }
-    ]
-  };
-
-  await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  });
-}
-
-/* ============================================================
-   リザルト背景画像（デフォ赤 → ユーザー優先）
-============================================================ */
-let resultBgImage = null;
-
-document.getElementById("resultBgInput").onchange = e => {
-  const file = e.target.files[0];
-  if (!file) return;
-
-  const reader = new FileReader();
-  reader.onload = () => {
-    resultBgImage = new Image();
-    resultBgImage.src = reader.result;
-  };
-  reader.readAsDataURL(file);
-};
-
-/* ============================================================
-   リザルト画像生成（Canvas）
-============================================================ */
-function generateResultImage() {
-  const canvas = document.createElement("canvas");
-  canvas.width = 1280;
-  canvas.height = 720;
-  const ctx = canvas.getContext("2d");
-
-  if (resultBgImage) {
-    ctx.drawImage(resultBgImage, 0, 0, canvas.width, canvas.height);
-  } else {
-    const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
-    grad.addColorStop(0, "#8b0000");
-    grad.addColorStop(1, "#b30000");
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-  }
-
-  ctx.fillStyle = "white";
-  ctx.font = "bold 48px sans-serif";
-  ctx.fillText("12 race result", 40, 80);
-
-  const scores = calcScores();
-  const sorted = [...state.teams].sort((a, b) => scores[b] - scores[a]);
-  const topScore = scores[sorted[0]];
-
-  ctx.font = "bold 36px sans-serif";
-  let y = 160;
-
-  sorted.forEach((team, i) => {
-    const score = scores[team];
-    const diff = score - topScore;
-    const diffText = diff === 0 ? "" : ` (${diff > 0 ? "+" : ""}${diff})`;
-
-    ctx.fillText(`${i + 1}位：${team}  ${score}点${diffText}`, 40, y);
-    y += 60;
-  });
-
-  const graphX = 40;
-  const graphY = 400;
-  const graphW = 1200;
-  const graphH = 250;
-
-  ctx.strokeStyle = "rgba(255,255,255,0.3)";
-  ctx.strokeRect(graphX, graphY, graphW, graphH);
-
-  const colors = ["#ff5555", "#55aaff", "#55ff55", "#ffaa00", "#ff55ff", "#00ffaa"];
-
-  sorted.forEach((team, idx) => {
-    ctx.strokeStyle = colors[idx % colors.length];
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-
-    for (let r = 0; r < 12; r++) {
-      const rank = state.teamRanks[r]?.[team] ?? 24;
-      const score = 25 - rank;
-
-      const x = graphX + (graphW / 11) * r;
-      const y = graphY + graphH - (score * (graphH / 25));
-
-      if (r === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
-    }
-
-    ctx.stroke();
-  });
-
-  return canvas.toDataURL("image/png");
-}
-
-/* ============================================================
-   リザルト画像を Webhook に送信
-============================================================ */
-async function sendResultImageToSelected(imgBase64) {
-  if (activeWebhookIndex < 0) return;
-
-  const url = webhookList[activeWebhookIndex];
-  const blob = await (await fetch(imgBase64)).blob();
-
-  const form = new FormData();
-  form.append("file", blob, "result.png");
-  form.append("payload_json", JSON.stringify({
-    username: "MK Sokuzi",
-    content: "12R 終了 — リザルト画像"
-  }));
-
-  await fetch(url, {
-    method: "POST",
-    body: form
-  });
-}
-
-/* ============================================================
-   12R 終了処理
-============================================================ */
-function checkIfSetFinished() {
-  if (Object.keys(state.teamRanks).length === 12) {
-    onSetFinished();
-  }
-}
-
-async function onSetFinished() {
-  const imgBase64 = generateResultImage();
-
-  document.getElementById("resultImageLocal").src = imgBase64;
-  document.getElementById("resultImageArea").style.display = "block";
-
-  await fetch(GAS_URL, {
-    method: "POST",
-    body: JSON.stringify({
-      type: "resultImage",
-      image: imgBase64
-    })
-  });
-
-  await sendResultImageToSelected(imgBase64);
-  await resetOverlayOnGAS();
-
-  alert("12R 終了 → リザルト画像を生成し、選択された Webhook に送信しました");
-}
-
-/* ============================================================
-   画像保存
-============================================================ */
-function downloadResultImage() {
-  const img = document.getElementById("resultImageLocal").src;
-  const a = document.createElement("a");
-  a.href = img;
-  a.download = "result.png";
-  a.click();
-}
-
-/* ============================================================
-   OBS overlay
-============================================================ */
-function openOverlay() {
-  window.open("overlay.html", "_blank");
-} 
-</script>
+
+<!-- Webhook タブ -->
+<div id="webhookTab" class="tabContent" style="display:none;">
+
+  <h3>Webhook URL 設定</h3>
+
+  <div style="margin-bottom:10px;">
+    <input id="webhookNameInput" placeholder="名前（例：メモ用）" style="width:30%;">
+    <input id="webhookInput" placeholder="https://discord.com/api/webhooks/..." style="width:50%;">
+    <button onclick="addWebhook()">追加</button>
+  </div>
+
+
+  <h4>登録済み Webhook</h4>
+  <div id="webhookListArea"></div>
+
+</div>
+  
+<!-- 戦績タブ -->
+<div id="analysisTab" class="tabContent" style="display:none;">
+
+  <h3>チーム別戦績分析</h3>
+
+  <label>チーム：</label>
+  <select id="analysisTeamSelect" onchange="updateTeamAnalysis()"></select>
+
+  <h4>コース別 勝率 / 平均得点 / 期待値 / 安定度</h4>
+  <table id="tableCourseStats" border="1" cellpadding="6" style="width:100%; background:#fff;"></table>
+
+  <h4 style="margin-top:20px;">相手チーム別 勝率 / 平均得点差</h4>
+  <table id="tableOpponentStats" border="1" cellpadding="6" style="width:100%; background:#fff;"></table>
+
+  <h4 style="margin-top:20px;">コース × 相手チーム 勝率マトリクス</h4>
+  <table id="tableCourseOpponentMatrix" border="1" cellpadding="6" style="width:100%; background:#fff;"></table>
+
+  <h4 style="margin-top:20px;">コース × 相手チーム 得点差マトリクス</h4>
+  <table id="tableCourseOpponentScoreDiffMatrix" border="1" cellpadding="6" style="width:100%; background:#fff;"></table>
+
+  <h4 style="margin-top:20px;">コース別レーダーチャート</h4>
+  <canvas id="chartCourseRadar" width="400" height="400"></canvas>
+
+  <h4 style="margin-top:20px;">相手チーム別レーダーチャート</h4>
+  <canvas id="chartOpponentRadar" width="400" height="400"></canvas>
+
+  <h4 style="margin-top:20px;">コース × 相手チーム ヒートマップ</h4>
+  <canvas id="chartCourseOpponentHeatmap" width="600" height="600"></canvas>
+
+  <h4 style="margin-top:20px;">コース得意 TOP10</h4>
+  <table id="tableStrongCourses" border="1" cellpadding="6" style="width:100%; background:#fff;"></table>
+
+  <h4 style="margin-top:20px;">コース苦手 TOP10</h4>
+  <table id="tableWeakCourses" border="1" cellpadding="6" style="width:100%; background:#fff;"></table>
+
+  <h4 style="margin-top:20px;">安定度 TOP10（標準偏差が小さい）</h4>
+  <table id="tableStableCourses" border="1" cellpadding="6" style="width:100%; background:#fff;"></table>
+
+  <h4 style="margin-top:20px;">不安定 TOP10（標準偏差が大きい）</h4>
+  <table id="tableUnstableCourses" border="1" cellpadding="6" style="width:100%; background:#fff;"></table>
+
+</div>
+
+
+<!-- リザルトタブ -->
+<div id="resultTab" class="tabContent" style="display:none;">
+  <h3>背景画像</h3>
+  <input type="file" id="bgImageInput" accept="image/*" onchange="loadBackgroundImage(this.files[0])">
+  <div style="font-size:12px;color:#666;">未設定の場合はデフォルト背景を使用</div>
+
+
+  <h3>リザルト画像</h3>
+  <button onclick="generateResultImage()">リザルト画像を生成</button>
+
+  <canvas id="resultCanvas" width="800" height="1200" style="display:none;"></canvas>
+
+</div>
+
+<hr>
+
+<h3>集計表示</h3>
+<div class="button-bar">
+  <button onclick="showRanking()">順位表</button>
+  <button onclick="showRoundScores()">ラウンド別スコア</button>
+  <button onclick="showTeamProgress()">チーム別推移</button>
+</div>
+
+<h3>即時集計送信</h3>
+<button onclick="sendInstantScoreMulti(false)">途中経過を送信</button>
+
+<div id="aggregateArea" style="margin-top:20px;"></div>
+
+
+<script src="main.js"></script>
+
 </body>
 </html>
+
