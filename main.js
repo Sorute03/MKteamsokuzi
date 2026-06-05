@@ -2120,17 +2120,28 @@ function sendOverlay() {
 function initTabs() {
   const tabs = document.querySelectorAll(".tabBtn");
   const contents = document.querySelectorAll(".tabContent");
+
   tabs.forEach(btn => {
     btn.addEventListener("click", () => {
       const tab = btn.dataset.tab;
+
+      // ▼ タブ切り替え
       tabs.forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
       contents.forEach(c => {
         c.style.display = (c.id === tab) ? "block" : "none";
       });
+
+      // ▼ ★ 追加：Overlay タブのときだけ body にクラス付与
+      if (tab === "overlayTab") {
+        document.body.classList.add("overlay-mode");
+      } else {
+        document.body.classList.remove("overlay-mode");
+      }
     });
   });
 }
+
 
 window.addEventListener("load", () => {
   initTabs();
