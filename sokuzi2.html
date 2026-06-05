@@ -30,17 +30,7 @@ body { margin:0; padding:10px; font-family:sans-serif; }
 </style>
 </head>
 <body>
-<!-- ▼ OBS に表示する overlay.html（最前面） -->
-<iframe id="overlayFrame" src="https://sorute03.github.io/MKteamsokuzi/overlay.html"
-        style="
-          position:fixed;
-          left:0; top:0;
-          width:100vw; height:100vh;
-          border:none;
-          pointer-events:none;   /* ← 入力UIを触れるようにする */
-          z-index:99999;
-        ">
-</iframe>
+
 
 
 <!-- タブ -->
@@ -52,6 +42,25 @@ body { margin:0; padding:10px; font-family:sans-serif; }
   <button class="tabBtn" data-tab="p2pTab">P2P</button>
   <button class="tabBtn" data-tab="resultTab">リザルト</button>
   <button class="tabBtn" data-tab="webhookTab">Webhook</button>
+  <button class="tabBtn" data-tab="overlayTab">Overlay</button>
+</div>
+
+<div id="overlayTab" class="tabContent" style="display:none; position:relative; height:600px;">
+
+  <iframe id="overlayFrame"
+          src="https://sorute03.github.io/MKteamsokuzi/overlay.html"
+          style="
+            position:absolute;
+            top:50%;
+            left:50%;
+            transform:translate(-50%, -50%);
+            width:800px;
+            height:450px;
+            border:none;
+            z-index:10;
+          ">
+  </iframe>
+
 </div>
 
 <!-- 入力タブ -->
