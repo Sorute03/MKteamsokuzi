@@ -144,6 +144,22 @@ body { margin:0; padding:10px; font-family:sans-serif; }
 
 </div>
 
+<!-- Webhook タブ -->
+<div id="webhookTab" class="tabContent" style="display:none;">
+
+  <h3>Webhook URL 設定</h3>
+
+  <div style="margin-bottom:10px;">
+    <input id="webhookInput" placeholder="https://discord.com/api/webhooks/..." style="width:80%;">
+    <button onclick="addWebhook()">追加</button>
+  </div>
+
+  <h4>登録済み Webhook</h4>
+  <div id="webhookListArea"></div>
+
+</div>
+
+
 <!-- リザルトタブ -->
 <div id="resultTab" class="tabContent" style="display:none;">
   <h3>背景画像</h3>
