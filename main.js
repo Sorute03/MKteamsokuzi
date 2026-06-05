@@ -980,6 +980,482 @@ async function sendInstantScoreMulti(silent = false) {
 
 
 /* ============================================================
+   分析関連
+============================================================ */
+
+function initTeamAnalysisUI() {
+  const sel = document.getElementById("analysisTeamSelect");
+  if (!sel) return;
+  if (!state.teams || state.teams.length === 0) return;
+
+  sel.innerHTML = state.teams
+    .map(t => `<option value="${t}">${t}</option>`)
+    .join("");
+
+  // 初期表示
+  updateTeamAnalysis();
+}
+
+function calcStdDev(values) {
+  if (!values || values.length === 0) return 0;
+  const avg = values.reduce((a, b) => a + b, 0) / values.length;
+  const variance = values.reduce((a, b) => a + Math.pow(b - avg, 2), 0) / values.length;
+  return Math.sqrt(variance);
+}
+
+
+function calcCourseStats(team) {
+  const stats = {};
+
+  for (const course of state.courseNames) {
+    stats[course] = {
+      count: 0,
+      wins: 0,
+      totalScore: 0,
+      scores: []
+    };
+  }
+
+  const records = state.teamRanks[team] || [];
+
+  for (const r of records) {
+    const c = r.course;
+    if (!stats[c]) continue;
+
+    stats[c].count++;
+    stats[c].totalScore += r.score;
+    stats[c].scores.push(r.score);
+    if (r.rank <= 3) stats[c].wins++;
+  }
+
+  for (const c of state.courseNames) {
+    const s = stats[c];
+    s.stddev = calcStdDev(s.scores);
+  }
+
+  return stats;
+}
+
+function calcOpponentStats(team) {
+  const stats = {};
+
+  for (const opp of state.teams) {
+    if (opp === team) continue;
+
+    stats[opp] = {
+      count: 0,
+      wins: 0,
+      scoreDiff: 0
+    };
+  }
+
+  const myRecords = state.teamRanks[team] || [];
+
+  for (const r of myRecords) {
+    for (const opp of state.teams) {
+      if (opp === team) continue;
+
+      const oppRecord = state.teamRanks[opp]?.find(x => x.raceId === r.raceId);
+      if (!oppRecord) continue;
+
+      stats[opp].count++;
+      if (r.rank < oppRecord.rank) stats[opp].wins++;
+      stats[opp].scoreDiff += (r.score - oppRecord.score);
+    }
+  }
+
+  return stats;
+}
+
+function calcCourseOpponentMatrix(team) {
+  const matrix = {};
+
+  for (const course of state.courseNames) {
+    matrix[course] = {};
+    for (const opp of state.teams) {
+      if (opp === team) continue;
+      matrix[course][opp] = { count: 0, wins: 0 };
+    }
+  }
+
+  const myRecords = state.teamRanks[team] || [];
+
+  for (const r of myRecords) {
+    const course = r.course;
+
+    for (const opp of state.teams) {
+      if (opp === team) continue;
+
+      const oppRecord = state.teamRanks[opp]?.find(x => x.raceId === r.raceId);
+      if (!oppRecord) continue;
+
+      const cell = matrix[course][opp];
+      cell.count++;
+      if (r.rank < oppRecord.rank) cell.wins++;
+    }
+  }
+
+  return matrix;
+}
+
+function calcCourseOpponentScoreDiffMatrix(team) {
+  const matrix = {};
+
+  for (const course of state.courseNames) {
+    matrix[course] = {};
+    for (const opp of state.teams) {
+      if (opp === team) continue;
+      matrix[course][opp] = { count: 0, scoreDiff: 0 };
+    }
+  }
+
+  const myRecords = state.teamRanks[team] || [];
+
+  for (const r of myRecords) {
+    const course = r.course;
+
+    for (const opp of state.teams) {
+      if (opp === team) continue;
+
+      const oppRecord = state.teamRanks[opp]?.find(x => x.raceId === r.raceId);
+      if (!oppRecord) continue;
+
+      const cell = matrix[course][opp];
+      cell.count++;
+      cell.scoreDiff += (r.score - oppRecord.score);
+    }
+  }
+
+  return matrix;
+}
+
+function calcCourseStrengthRanking(team) {
+  const stats = calcCourseStats(team);
+  const result = [];
+
+  for (const course of state.courseNames) {
+    const s = stats[course];
+    if (!s || s.count === 0) continue;
+
+    const winRate = s.wins / s.count;
+    const avgScore = s.totalScore / s.count;
+    const stddev = s.stddev;
+
+    const score =
+      avgScore * 0.5 +
+      winRate * 40 * 0.4 +
+      (1 / (1 + stddev)) * 20;
+
+    result.push({
+      course,
+      count: s.count,
+      winRate,
+      avgScore,
+      stddev,
+      score
+    });
+  }
+
+  const strong = [...result].sort((a, b) => b.score - a.score).slice(0, 10);
+  const weak   = [...result].sort((a, b) => a.score - b.score).slice(0, 10);
+
+  return { strong, weak };
+}
+
+function calcStabilityRanking(team) {
+  const stats = calcCourseStats(team);
+  const list = [];
+
+  for (const course of state.courseNames) {
+    const s = stats[course];
+    if (!s || s.count === 0) continue;
+
+    list.push({
+      course,
+      count: s.count,
+      stddev: s.stddev
+    });
+  }
+
+  const stable   = [...list].sort((a, b) => a.stddev - b.stddev).slice(0, 10);
+  const unstable = [...list].sort((a, b) => b.stddev - a.stddev).slice(0, 10);
+
+  return { stable, unstable };
+}
+
+function renderCourseStats(stats) {
+  const table = document.getElementById("tableCourseStats");
+  if (!table) return;
+
+  let html = `
+    <tr>
+      <th>コース</th>
+      <th>走行数</th>
+      <th>勝率</th>
+      <th>平均得点</th>
+      <th>期待値</th>
+      <th>安定度（標準偏差）</th>
+    </tr>
+  `;
+
+  for (const course of state.courseNames) {
+    const s = stats[course];
+    if (!s || s.count === 0) continue;
+
+    html += `
+      <tr>
+        <td>${course}</td>
+        <td>${s.count}</td>
+        <td>${(s.wins / s.count * 100).toFixed(1)}%</td>
+        <td>${(s.totalScore / s.count).toFixed(2)}</td>
+        <td>${(s.totalScore / s.count).toFixed(2)}</td>
+        <td>${s.stddev.toFixed(2)}</td>
+      </tr>
+    `;
+  }
+
+  table.innerHTML = html;
+}
+
+function renderOpponentStats(stats) {
+  const table = document.getElementById("tableOpponentStats");
+  if (!table) return;
+
+  let html = `
+    <tr>
+      <th>相手チーム</th>
+      <th>対戦数</th>
+      <th>勝率</th>
+      <th>平均得点差</th>
+    </tr>
+  `;
+
+  for (const opp of state.teams) {
+    if (!stats[opp]) continue;
+
+    const s = stats[opp];
+    if (s.count === 0) continue;
+
+    html += `
+      <tr>
+        <td>${opp}</td>
+        <td>${s.count}</td>
+        <td>${(s.wins / s.count * 100).toFixed(1)}%</td>
+        <td>${(s.scoreDiff / s.count).toFixed(2)}</td>
+      </tr>
+    `;
+  }
+
+  table.innerHTML = html;
+}
+
+function renderCourseOpponentMatrix(matrix) {
+  const table = document.getElementById("tableCourseOpponentMatrix");
+  if (!table) return;
+
+  let html = "<tr><th>コース</th>";
+  for (const opp of state.teams) html += `<th>${opp}</th>`;
+  html += "</tr>";
+
+  for (const course of state.courseNames) {
+    html += `<tr><td>${course}</td>`;
+
+    for (const opp of state.teams) {
+      const cell = matrix[course][opp];
+      if (!cell || cell.count === 0) {
+        html += "<td>-</td>";
+        continue;
+      }
+
+      html += `<td>${(cell.wins / cell.count * 100).toFixed(1)}%</td>`;
+    }
+
+    html += "</tr>";
+  }
+
+  table.innerHTML = html;
+}
+
+function renderCourseOpponentScoreDiffMatrix(matrix) {
+  const table = document.getElementById("tableCourseOpponentScoreDiffMatrix");
+  if (!table) return;
+
+  let html = "<tr><th>コース</th>";
+  for (const opp of state.teams) html += `<th>${opp}</th>`;
+  html += "</tr>";
+
+  for (const course of state.courseNames) {
+    html += `<tr><td>${course}</td>`;
+
+    for (const opp of state.teams) {
+      const cell = matrix[course][opp];
+      if (!cell || cell.count === 0) {
+        html += "<td>-</td>";
+        continue;
+      }
+
+      html += `<td>${(cell.scoreDiff / cell.count).toFixed(2)}</td>`;
+    }
+
+    html += "</tr>";
+  }
+
+  table.innerHTML = html;
+}
+
+let courseRadarChart = null;
+
+function buildCourseRadarData(team) {
+  const stats = calcCourseStats(team);
+
+  return {
+    labels: state.courseNames,
+    datasets: [{
+      label: `${team} 平均得点`,
+      data: state.courseNames.map(c => {
+        const s = stats[c];
+        return s.count ? (s.totalScore / s.count) : 0;
+      }),
+      borderColor: "rgba(255,99,132,1)",
+      backgroundColor: "rgba(255,99,132,0.2)"
+    }]
+  };
+}
+
+function renderCourseRadar(team) {
+  const ctx = document.getElementById("chartCourseRadar").getContext("2d");
+  const data = buildCourseRadarData(team);
+
+  if (courseRadarChart) courseRadarChart.destroy();
+
+  courseRadarChart = new Chart(ctx, {
+    type: "radar",
+    data,
+    options: {
+      scales: { r: { beginAtZero: true } }
+    }
+  });
+}
+
+let opponentRadarChart = null;
+
+function buildOpponentRadarData(team) {
+  const stats = calcOpponentStats(team);
+
+  return {
+    labels: state.teams.filter(t => t !== team),
+    datasets: [{
+      label: `${team} vs 相手チーム 平均得点差`,
+      data: state.teams
+        .filter(t => t !== team)
+        .map(opp => {
+          const s = stats[opp];
+          return s.count ? (s.scoreDiff / s.count) : 0;
+        }),
+      borderColor: "rgba(54,162,235,1)",
+      backgroundColor: "rgba(54,162,235,0.2)"
+    }]
+  };
+}
+
+function renderOpponentRadar(team) {
+  const ctx = document.getElementById("chartOpponentRadar").getContext("2d");
+  const data = buildOpponentRadarData(team);
+
+  if (opponentRadarChart) opponentRadarChart.destroy();
+
+  opponentRadarChart = new Chart(ctx, {
+    type: "radar",
+    data,
+    options: {
+      scales: { r: { beginAtZero: true } }
+    }
+  });
+}
+
+let heatmapChart = null;
+
+function buildCourseOpponentHeatmap(team) {
+  const matrix = calcCourseOpponentScoreDiffMatrix(team);
+  const data = [];
+
+  state.courseNames.forEach((course, i) => {
+    state.teams.forEach((opp, j) => {
+      if (opp === team) return;
+
+      const cell = matrix[course][opp];
+      const value = cell && cell.count ? (cell.scoreDiff / cell.count) : 0;
+
+      data.push({
+        x: opp,
+        y: course,
+        v: value
+      });
+    });
+  });
+
+  return data;
+}
+
+function renderCourseOpponentHeatmap(team) {
+  const ctx = document.getElementById("chartCourseOpponentHeatmap").getContext("2d");
+  const data = buildCourseOpponentHeatmap(team);
+
+  if (heatmapChart) heatmapChart.destroy();
+
+  heatmapChart = new Chart(ctx, {
+    type: "matrix",
+    data: {
+      datasets: [{
+        label: "得点差ヒートマップ",
+        data,
+        backgroundColor(ctx) {
+          const v = ctx.dataset.data[ctx.dataIndex].v;
+          return v > 0 ? "rgba(0,200,0,0.6)" : "rgba(200,0,0,0.6)";
+        },
+        width: ({chart}) => (chart.chartArea.width / state.teams.length),
+        height: ({chart}) => (chart.chartArea.height / state.courseNames.length)
+      }]
+    },
+    options: {
+      scales: {
+        x: { type: "category", labels: state.teams },
+        y: { type: "category", labels: state.courseNames }
+      }
+    }
+  });
+}
+
+function updateTeamAnalysis() {
+  const sel = document.getElementById("analysisTeamSelect");
+  if (!sel) return;
+  const team = sel.value;
+  if (!team) return;
+
+  const courseStats = calcCourseStats(team);
+  const oppStats = calcOpponentStats(team);
+  const matrix = calcCourseOpponentMatrix(team);
+  const scoreMatrix = calcCourseOpponentScoreDiffMatrix(team);
+  const ranking = calcCourseStrengthRanking(team);
+  const stability = calcStabilityRanking(team);
+
+  renderCourseStats(courseStats);
+  renderOpponentStats(oppStats);
+  renderCourseOpponentMatrix(matrix);
+  renderCourseOpponentScoreDiffMatrix(scoreMatrix);
+
+  renderCourseRadar(team);
+  renderOpponentRadar(team);
+  renderCourseOpponentHeatmap(team);
+
+  renderStrongCourseRanking(ranking.strong);
+  renderWeakCourseRanking(ranking.weak);
+  renderStableCourseRanking(stability.stable);
+  renderUnstableCourseRanking(stability.unstable);
+}
+
+
+/* ============================================================
    JSON 関連
 ============================================================ */
 
