@@ -50,6 +50,17 @@ window.addEventListener("message", (event) => {
   updateOverlayUI(data);
 });
 
+function getTargetWindow() {
+  if (window.opener) return window.opener; // OBS / ローカル単体
+  if (window.parent && window.parent !== window) return window.parent; // iframe
+  return null;
+}
+
+setTimeout(() => {
+  const target = getTargetWindow();
+  target?.postMessage({ type: "requestOverlay" }, "*");
+}, 300);
+
 // UI 更新：scores は「チーム名キーのオブジェクト」として扱う
 function updateOverlayUI(data) {
   const teams = data.teams.map(name => ({
