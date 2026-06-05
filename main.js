@@ -162,11 +162,31 @@ function isFullDataDuplicate(record, existingList) {
       return true;
     }
 
-    // C. 特定チームモードの部分一致
+    // C. 特定チームモードでも「同じロジック」で判定するために
+    //    record が部分データなら、existing から同じ部分を抽出して比較する
     if (record.teams.length === 1) {
       const t = record.teams[0];
-      if (existing.teamRanks[t] &&
-          JSON.stringify(existing.teamRanks[t]) === JSON.stringify(record.teamRanks[t])) {
+
+      // existing にそのチームが存在しないなら比較不可 → 重複ではない
+      if (!existing.teamRanks[t]) return false;
+
+      const existingPartial = {
+        teams: [t],
+        courses: existing.courses,
+        teamRanks: { [t]: existing.teamRanks[t] }
+      };
+
+      const recordPartial = {
+        teams: [t],
+        courses: record.courses,
+        teamRanks: record.teamRanks
+      };
+
+      const sameTeams2   = JSON.stringify(existingPartial.teams)     === JSON.stringify(recordPartial.teams);
+      const sameCourses2 = JSON.stringify(existingPartial.courses)   === JSON.stringify(recordPartial.courses);
+      const sameRanks2   = JSON.stringify(existingPartial.teamRanks) === JSON.stringify(recordPartial.teamRanks);
+
+      if (sameTeams2 && sameCourses2 && sameRanks2) {
         return true;
       }
     }
@@ -174,6 +194,7 @@ function isFullDataDuplicate(record, existingList) {
     return false;
   });
 }
+
 
 
 /* ============================================================
