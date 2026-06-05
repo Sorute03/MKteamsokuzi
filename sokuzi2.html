@@ -122,7 +122,18 @@ body { margin:0; padding:10px; font-family:sans-serif; }
   <button onclick="downloadJSONFile()">JSON を保存</button>
   <input type="file" id="jsonFileInput" accept="application/json" onchange="uploadJSONFile(this.files[0])">
 
-  <h4>特定チーム JSON</h4>
+  <h3>JSON 共有モード</h3>
+  <select id="jsonShareModeSelect" onchange="updateJsonShareMode()">
+    <option value="all">全データ共有</option>
+    <option value="team">特定チームのみ</option>
+  </select>
+
+  <div id="jsonShareTeamArea" style="display:none; margin-top:6px;">
+    <label>チーム選択：</label>
+    <select id="jsonShareTeamSelect"></select>
+  </div>
+
+  <h4>特定チーム JSON（旧 UI）</h4>
   <input id="teamJsonInput" placeholder="チーム名">
   <button onclick="downloadTeamJSONFile(document.getElementById('teamJsonInput').value)">保存</button>
 
@@ -133,6 +144,7 @@ body { margin:0; padding:10px; font-family:sans-serif; }
 
 </div>
 
+
 <!-- P2P タブ -->
 <div id="p2pTab" class="tabContent" style="display:none;">
 
@@ -140,9 +152,21 @@ body { margin:0; padding:10px; font-family:sans-serif; }
   <button onclick="startP2PHost()">ホスト開始</button>
   <button onclick="startP2PClient()">クライアント接続</button>
 
+  <h3>P2P 共有モード</h3>
+  <select id="p2pShareModeSelect" onchange="updateP2pShareMode()">
+    <option value="all">全データ共有</option>
+    <option value="team">特定チームのみ</option>
+  </select>
+
+  <div id="p2pShareTeamArea" style="display:none; margin-top:6px;">
+    <label>チーム選択：</label>
+    <select id="p2pShareTeamSelect"></select>
+  </div>
+
   <div id="p2pStatus" style="margin-top:10px;"></div>
 
 </div>
+
 
 <!-- Webhook タブ -->
 <div id="webhookTab" class="tabContent" style="display:none;">
