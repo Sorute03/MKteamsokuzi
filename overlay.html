@@ -36,19 +36,24 @@ body {
 <div id="overlay">待機中...</div>
 
 <script>
-const bc = new BroadcastChannel("mk_overlay");
+// ▼ 親（sokuzi.html）に途中経過を要求
+window.parent.postMessage({ type: "requestOverlay" }, "*");
 
-bc.onmessage = (event) => {
+// ▼ 親からデータ受信
+window.addEventListener("message", (event) => {
   const data = event.data;
-  if (data.type !== "overlay") return;
+  if (!data || data.type !== "overlay") return;
 
-  // ▼ GAS と同じ並び順にソート（score 降順）
-  const teams = data.teams.map((t, i) => ({
-    name: t,
+  updateOverlayUI(data);
+});
+
+// ▼ GAS と同じレイアウトで表示
+function updateOverlayUI(data) {
+  const teams = data.teams.map((name, i) => ({
+    name,
     score: data.scores[i] ?? 0
   })).sort((a, b) => b.score - a.score);
 
-  // ▼ GAS と同じ HTML を生成
   let html = "<div style='display:flex; gap:20px; justify-content:center; align-items:center;'>";
 
   for (let i = 0; i < teams.length; i++) {
@@ -58,7 +63,7 @@ bc.onmessage = (event) => {
   html += "</div>";
 
   document.getElementById("overlay").innerHTML = html;
-};
+}
 </script>
 
 </body>
