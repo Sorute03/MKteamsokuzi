@@ -227,23 +227,33 @@ function saveWebhookSettings() {
 }
 
 
+
 function addWebhook() {
-  const url = document.getElementById("webhookInput").value.trim();
+  const name = document.getElementById("webhookNameInput").value.trim();
+  const url  = document.getElementById("webhookInput").value.trim();
+
   if (!url) return alert("URL を入力してください");
+  if (!name) return alert("名前を入力してください");
 
   if (!url.startsWith("https://discord.com/api/webhooks/")) {
     return alert("Discord Webhook URL の形式ではありません");
   }
 
-  webhookList.push({ url, enabled: true });
+  webhookList.push({
+    name,
+    url,
+    enabled: true
+  });
 
   if (activeWebhookIndex === -1) activeWebhookIndex = 0;
 
   saveWebhookSettings();
   renderWebhookList();
 
+  document.getElementById("webhookNameInput").value = "";
   document.getElementById("webhookInput").value = "";
 }
+
 
 function toggleWebhookEnabled(index) {
   webhookList[index].enabled = !webhookList[index].enabled;
@@ -268,6 +278,15 @@ function selectWebhook(index) {
   renderWebhookList();
 }
 
+function editWebhookName(index) {
+  const newName = prompt("新しい名前を入力", webhookList[index].name);
+  if (!newName) return;
+  webhookList[index].name = newName.trim();
+  saveWebhookSettings();
+  renderWebhookList();
+}
+
+
 function renderWebhookList() {
   const area = document.getElementById("webhookListArea");
   if (!area) return;
@@ -285,9 +304,10 @@ function renderWebhookList() {
 
     html += `
       <div style="margin-bottom:6px;">
-        <span ${active}>${item.url}</span>
+        <span ${active}>【${item.name}】 ${item.url}</span>
         <button onclick="selectWebhook(${i})">使用</button>
         <button onclick="toggleWebhookEnabled(${i})" style="color:${enabledColor};">${enabledText}</button>
+        <button onclick="editWebhookName(${i})">名前変更</button>
         <button onclick="deleteWebhook(${i})">削除</button>
       </div>
     `;
@@ -295,6 +315,7 @@ function renderWebhookList() {
 
   area.innerHTML = html;
 }
+
 
 /* ============================================================
    チーム名・モード設定
