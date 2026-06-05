@@ -2062,7 +2062,7 @@ function sendHistoryToGAS() {
   alert("共有保存（GAS）はまだ実装されていません");
 }
 
-const OVERLAY_GAS_URL = "https://script.google.com/macros/s/AKfycbxO7EP7EdOhmffRz_PTNZLChGnb5jk9YDgO8ZbBv0Ga_N919IO1Ggq3HveAGMqNBIwa/exec"; // ← あなたの GAS URL
+const OVERLAY_GAS_URL = "https://script.google.com/macros/s/AKfycbxiVYHfDMyqiZHfUYFSe3P4J6AbQQNp81q-TQDTh9y08bXW1U2zZPzXkNyLAR3whz9a/exec"; // ← あなたの GAS URL
 
 function sendOverlay() {
   const payload = {
