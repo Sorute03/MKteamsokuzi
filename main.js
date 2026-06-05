@@ -2064,6 +2064,9 @@ function sendHistoryToGAS() {
 
 const OVERLAY_GAS_URL = "https://script.google.com/macros/s/AKfycbzpc671wkm1y3JU1IrQxAGKMsPn1ztzLm_FmiC7SVdPLLSLynoT5qnATYoXZUTOHyvo/exec"; // ← あなたの GAS URL
 
+// ▼ 送信用チャンネルを作成
+const bc = new BroadcastChannel("mk_overlay");
+
 function sendOverlay() {
   const payload = {
     type: "overlay",
@@ -2077,20 +2080,8 @@ function sendOverlay() {
     scores: calculateTeamScores()
   };
 
-  const form = document.createElement("form");
-  form.method = "POST";
-  form.action = OVERLAY_GAS_URL;
-  form.target = "hiddenFrame";
-
-  const input = document.createElement("input");
-  input.type = "hidden";
-  input.name = "payload";
-  input.value = JSON.stringify(payload);
-
-  form.appendChild(input);
-  document.body.appendChild(form);
-  form.submit();
-  form.remove();
+  // ▼ GAS ではなく overlay.html に直接送信
+  bc.postMessage(payload);
 }
 
 /* ============================================================
