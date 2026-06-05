@@ -11,15 +11,15 @@ body {
   justify-content: center;
   align-items: flex-end;
   height: 100vh;
+  font-family: sans-serif;
 }
 
 #overlay {
-  background-color: rgba(0,0,0,0.5);
+  background-color: rgba(0,0,0,0.55);
   color: white;
-  padding: 12px;
+  padding: 12px 20px;
   font-size: 24px;
   border-radius: 8px;
-  font-family: sans-serif;
   display: flex;
   gap: 20px;
   justify-content: center;
@@ -36,8 +36,10 @@ body {
 <div id="overlay">待機中...</div>
 
 <script>
-// ▼ 親（sokuzi.html）に途中経過を要求
-window.parent.postMessage({ type: "requestOverlay" }, "*");
+// ▼ 親（sokuzi.html）にデータ要求（遅延させて state 初期化を待つ）
+setTimeout(() => {
+  window.parent.postMessage({ type: "requestOverlay" }, "*");
+}, 300);
 
 // ▼ 親からデータ受信
 window.addEventListener("message", (event) => {
@@ -47,17 +49,24 @@ window.addEventListener("message", (event) => {
   updateOverlayUI(data);
 });
 
-// ▼ GAS と同じレイアウトで表示
+// ▼ UI 更新（scores は配列として扱う）
 function updateOverlayUI(data) {
   const teams = data.teams.map((name, i) => ({
     name,
     score: data.scores[i] ?? 0
-  })).sort((a, b) => b.score - a.score);
+  }));
 
-  let html = "<div style='display:flex; gap:20px; justify-content:center; align-items:center;'>";
+  // ▼ スコア順に並び替え
+  teams.sort((a, b) => b.score - a.score);
+
+  let html = "<div style='display:flex; gap:20px;'>";
 
   for (let i = 0; i < teams.length; i++) {
-    html += `<span class="team">${i+1}位 ${teams[i].name}：${teams[i].score}点</span>`;
+    html += `
+      <span class="team">
+        ${i+1}位 ${teams[i].name}：${teams[i].score}点
+      </span>
+    `;
   }
 
   html += "</div>";
