@@ -2062,9 +2062,9 @@ function sendHistoryToGAS() {
   alert("共有保存（GAS）はまだ実装されていません");
 }
 
-const OVERLAY_GAS_URL = "https://script.google.com/macros/s/AKfycbzzH0IcjsaoEJH9Zpg1--LW-oA-UzkC85Dakdgqrlx5O11YhO5P4kkvitfee3db9y15/exec"; // ← あなたの GAS URL
+const OVERLAY_GAS_URL = "https://script.google.com/macros/s/AKfycbxO7EP7EdOhmffRz_PTNZLChGnb5jk9YDgO8ZbBv0Ga_N919IO1Ggq3HveAGMqNBIwa/exec"; // ← あなたの GAS URL
 
-async function sendOverlay() {
+function sendOverlay() {
   const payload = {
     timestamp: state.timestamp || Date.now(),
     teams: state.teams,
@@ -2076,16 +2076,21 @@ async function sendOverlay() {
     scores: calculateTeamScores()
   };
 
-  try {
-    await fetch(OVERLAY_GAS_URL, {
-      method: "POST",
-      mode: "cors",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
-  } catch (e) {
-    console.warn("Overlay 送信失敗:", e);
-  }
+  // ▼ iframe POST で CORS 完全回避
+  const form = document.createElement("form");
+  form.method = "POST";
+  form.action = OVERLAY_GAS_URL;
+  form.target = "hiddenFrame";
+
+  const input = document.createElement("input");
+  input.type = "hidden";
+  input.name = "payload";
+  input.value = JSON.stringify(payload);
+
+  form.appendChild(input);
+  document.body.appendChild(form);
+  form.submit();
+  form.remove();
 }
 
 
