@@ -35,8 +35,9 @@ body {
 
 <div id="overlay">待機中...</div>
 
+<!-- ▼ script は必ず body の最後に置く -->
 <script>
-// ▼ 親にデータ要求
+// ▼ 親にデータ要求（遅延）
 setTimeout(() => {
   window.parent.postMessage({ type: "requestOverlay" }, "*");
 }, 300);
@@ -44,22 +45,22 @@ setTimeout(() => {
 // ▼ 親から受信
 window.addEventListener("message", (event) => {
   const data = event.data;
-  if (!data || data.type !== "overlay") return;
 
-  console.log("受信したpayload:", data);
+  console.log("受信したpayload:", data);  // ← ここで必ず中身が出るはず
+
+  if (!data || data.type !== "overlay") return;
 
   updateOverlayUI(data);
 });
 
-// ▼ UI 更新（scores はオブジェクト形式）
+// ▼ UI 更新（scores はオブジェクト）
 function updateOverlayUI(data) {
 
   const teams = data.teams.map(name => ({
     name,
-    score: data.scores[name] ?? 0   // ← ここが重要
+    score: data.scores[name] ?? 0
   }));
 
-  // ▼ スコア順に並び替え
   teams.sort((a, b) => b.score - a.score);
 
   let html = "<div style='display:flex; gap:20px;'>";
