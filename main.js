@@ -226,6 +226,7 @@ function saveWebhookSettings() {
   }));
 }
 
+
 function addWebhook() {
   const url = document.getElementById("webhookInput").value.trim();
   if (!url) return alert("URL を入力してください");
@@ -234,7 +235,8 @@ function addWebhook() {
     return alert("Discord Webhook URL の形式ではありません");
   }
 
-  webhookList.push(url);
+  webhookList.push({ url, enabled: true });
+
   if (activeWebhookIndex === -1) activeWebhookIndex = 0;
 
   saveWebhookSettings();
@@ -243,6 +245,11 @@ function addWebhook() {
   document.getElementById("webhookInput").value = "";
 }
 
+function toggleWebhookEnabled(index) {
+  webhookList[index].enabled = !webhookList[index].enabled;
+  saveWebhookSettings();
+  renderWebhookList();
+}
 
 function deleteWebhook(index) {
   webhookList.splice(index, 1);
@@ -271,12 +278,16 @@ function renderWebhookList() {
   }
 
   let html = "";
-  webhookList.forEach((url, i) => {
+  webhookList.forEach((item, i) => {
     const active = (i === activeWebhookIndex) ? "style='color:#4caf50;font-weight:bold;'" : "";
+    const enabledText = item.enabled ? "ON" : "OFF";
+    const enabledColor = item.enabled ? "#4caf50" : "#888";
+
     html += `
       <div style="margin-bottom:6px;">
-        <span ${active}>${url}</span>
+        <span ${active}>${item.url}</span>
         <button onclick="selectWebhook(${i})">使用</button>
+        <button onclick="toggleWebhookEnabled(${i})" style="color:${enabledColor};">${enabledText}</button>
         <button onclick="deleteWebhook(${i})">削除</button>
       </div>
     `;
@@ -556,7 +567,7 @@ function confirmRound(round) {
   sendOverlay();
 
   // ★ 途中経過送信（静かに）
-  sendInstantScoreSilent();
+  sendInstantScoreMulti(true);
 
   // 12R 目ならリザルト送信なども可能
 }
@@ -772,12 +783,15 @@ async function sendInstantScore() {
 }
 
 
-async function sendInstantScoreSilent() {
-  if (!webhookList.length || activeWebhookIndex < 0) {
-    return; // 何も言わずに終了
+async function sendInstantScoreMulti(silent = false) {
+  // ★ ON の Webhook だけ抽出
+  const enabledWebhooks = webhookList.filter(w => w.enabled);
+
+  if (!enabledWebhooks.length) {
+    if (!silent) alert("有効な Webhook がありません");
+    return;
   }
 
-  const url = webhookList[activeWebhookIndex];
   const ranking = calcRanking();
   if (!ranking.length) return;
 
@@ -802,11 +816,20 @@ async function sendInstantScoreSilent() {
     ]
   };
 
-  await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  });
+  // ★ ON の Webhook だけに送信
+  for (const w of enabledWebhooks) {
+    try {
+      await fetch(w.url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+    } catch (e) {
+      console.warn("Webhook 送信失敗:", w.url, e);
+    }
+  }
+
+  if (!silent) alert("途中経過を送信しました");
 }
 
 
