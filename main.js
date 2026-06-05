@@ -2073,8 +2073,19 @@ window.addEventListener("message", (event) => {
     sendOverlay();
   }
 });
+let overlayWin = null;
+
+function openOverlay() {
+  overlayWin = window.open("overlay.html", "overlayWindow");
+}
+
 
 // ▼ overlay.html に途中経過を返す
+
+function openOverlayWindow() {
+  overlayWin = window.open("overlay.html", "overlayWindow");
+}
+
 function sendOverlay() {
   const payload = {
     type: "overlay",
@@ -2087,9 +2098,19 @@ function sendOverlay() {
     teamRanks: state.teamRanks,
     penalty: state.penalty
   };
-　console.log("送信するpayload:", payload);
+
+  console.log("送信するpayload:", payload);
+
+  // ▼ ① iframe に送る（存在する場合）
   const iframe = document.getElementById("overlayFrame");
-  iframe.contentWindow.postMessage(payload, "*");
+  if (iframe && iframe.contentWindow) {
+    iframe.contentWindow.postMessage(payload, "*");
+  }
+
+  // ▼ ② window.open で開いた overlay.html に送る（OBS / ローカル単体）
+  if (overlayWin && !overlayWin.closed) {
+    overlayWin.postMessage(payload, "*");
+  }
 }
 
 /* ============================================================
