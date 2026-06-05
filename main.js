@@ -2087,7 +2087,7 @@ function sendOverlay() {
     teamRanks: state.teamRanks,
     penalty: state.penalty
   };
-
+　console.log("送信するpayload:", payload);
   const iframe = document.getElementById("overlayFrame");
   iframe.contentWindow.postMessage(payload, "*");
 }
