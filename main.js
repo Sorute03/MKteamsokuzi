@@ -316,6 +316,105 @@ function renderWebhookList() {
   area.innerHTML = html;
 }
 
+/* ============================================================
+   送受信モード設定
+============================================================ */
+
+// JSON 用
+let jsonShareMode = "all";
+let jsonShareTeam = null;
+
+// P2P 用
+let p2pShareMode = "all";
+let p2pShareTeam = null;
+
+
+function updateJsonShareMode() {
+  jsonShareMode = document.getElementById("jsonShareModeSelect").value;
+
+  const area = document.getElementById("jsonShareTeamArea");
+  if (jsonShareMode === "team") {
+    area.style.display = "block";
+    const sel = document.getElementById("jsonShareTeamSelect");
+    sel.innerHTML = state.teams.map(t => `<option>${t}</option>`).join("");
+    jsonShareTeam = sel.value;
+    sel.onchange = () => jsonShareTeam = sel.value;
+  } else {
+    area.style.display = "none";
+    jsonShareTeam = null;
+  }
+}
+
+function updateP2pShareMode() {
+  p2pShareMode = document.getElementById("p2pShareModeSelect").value;
+
+  const area = document.getElementById("p2pShareTeamArea");
+  if (p2pShareMode === "team") {
+    area.style.display = "block";
+    const sel = document.getElementById("p2pShareTeamSelect");
+    sel.innerHTML = state.teams.map(t => `<option>${t}</option>`).join("");
+    p2pShareTeam = sel.value;
+    sel.onchange = () => p2pShareTeam = sel.value;
+  } else {
+    area.style.display = "none";
+    p2pShareTeam = null;
+  }
+}
+
+function buildJsonSharedData() {
+  if (jsonShareMode === "all") {
+    return {
+      timestamp: state.timestamp || Date.now(),
+      teams: state.teams,
+      myTeam: state.myTeam,
+      enemyTeams: state.enemyTeams,
+      courses: state.courseNames,
+      teamRanks: state.teamRanks,
+      penalty: state.penalty
+    };
+  }
+
+  // ★ 特定チームのみ
+  const t = jsonShareTeam;
+
+  return {
+    timestamp: state.timestamp || Date.now(),
+    teams: [t],
+    myTeam: (state.myTeam === t ? t : ""),
+    enemyTeams: [],
+    courses: state.courseNames,
+    teamRanks: { [t]: state.teamRanks[t] },
+    penalty: { [t]: state.penalty[t] || 0 }
+  };
+}
+
+function buildP2pSharedData() {
+  if (p2pShareMode === "all") {
+    return {
+      timestamp: state.timestamp || Date.now(),
+      teams: state.teams,
+      myTeam: state.myTeam,
+      enemyTeams: state.enemyTeams,
+      courses: state.courseNames,
+      teamRanks: state.teamRanks,
+      penalty: state.penalty
+    };
+  }
+
+  // ★ 特定チームのみ
+  const t = p2pShareTeam;
+
+  return {
+    timestamp: state.timestamp || Date.now(),
+    teams: [t],
+    myTeam: (state.myTeam === t ? t : ""),
+    enemyTeams: [],
+    courses: state.courseNames,
+    teamRanks: { [t]: state.teamRanks[t] },
+    penalty: { [t]: state.penalty[t] || 0 }
+  };
+}
+
 
 /* ============================================================
    チーム名・モード設定
@@ -859,21 +958,15 @@ function exportJSON() {
   const ts = getUserTimestamp();
   state.timestamp = ts;
 
-  const data = {
-    timestamp: ts,
-    teams: state.teams,
-    myTeam: state.myTeam,
-    enemyTeams: state.enemyTeams,
-    courses: state.courseNames,
-    teamRanks: state.teamRanks,
-    penalty: state.penalty,
+  // ★ JSON 共有モードに応じてデータを構築
+  const data = buildJsonSharedData();
 
-    /* ★ ここに追加 */
-    backgroundImage: state.backgroundImage
-  };
+  // ★ 背景画像は常に含める（全データでも特定チームでも）
+  data.backgroundImage = state.backgroundImage || null;
 
   document.getElementById("jsonArea").value = JSON.stringify(data, null, 2);
 }
+
 
 function importJSON() {
   const area = document.getElementById("jsonArea");
@@ -1041,18 +1134,12 @@ function startP2PClient() {
 
 function sendP2PState() {
   if (!p2pChannel) return;
+
   const data = {
     type: "state",
-    payload: {
-      timestamp: state.timestamp || Date.now(),
-      teams: state.teams,
-      myTeam: state.myTeam,
-      enemyTeams: state.enemyTeams,
-      courses: state.courseNames,
-      teamRanks: state.teamRanks,
-      penalty: state.penalty
-    }
+    payload: buildP2pSharedData()   // ★ P2P 用共有モードを反映
   };
+
   p2pChannel.postMessage(data);
 }
 
