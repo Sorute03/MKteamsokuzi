@@ -2062,7 +2062,7 @@ function sendHistoryToGAS() {
   alert("共有保存（GAS）はまだ実装されていません");
 }
 
-const OVERLAY_GAS_URL = "https://script.google.com/macros/s/AKfycbzch_ygVCJzn1K2OD3sFHXE0dhrB45sifmCLJYsE9qvf6rRGhLHhcai95XxReOxXBE/exec"; // ← あなたの GAS URL
+const OVERLAY_GAS_URL = "https://script.google.com/macros/s/AKfycbzZia3f1KpJc7dtjj435t-PBOWwe5vgiNlgZfFjTvBzV7wO6HsdYWC8GHBE9U-usk73/exec"; // ← あなたの GAS URL
 
 // ▼ 送信用チャンネルを作成
 const bc = new BroadcastChannel("mk_overlay");
