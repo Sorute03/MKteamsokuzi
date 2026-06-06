@@ -2386,7 +2386,7 @@ function openOverlayWindow() {
   overlayWin = window.open("overlay.html", "overlayWindow");
 }
 
-async function sendOverlayToGAS(payload) {
+async function sendOverlay(payload) {
   await fetch("https://script.google.com/macros/s/AKfycbw9mZJGnCFMgNlBaY8AA8BNKrmxDBeKDHyI622GKpaJn1DEKvBEON4wexP1Q2nM6y_I/exec", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
