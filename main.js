@@ -2087,6 +2087,7 @@ function openOverlayWindow() {
 }
 
 async function sendOverlay(payload) {
+   console.log("送信前 payload:", payload);
   await fetch("https://script.google.com/macros/s/AKfycbw6V8r0QeDs6PTzgU_tC0mWe6vOojWAB6_Rfj1Q7KBcf2htcZNSnHFkB9F1ENi-BRuc/exec", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
