@@ -302,7 +302,20 @@ body.overlay-mode #tabs {
   /* ============================================================
    基本設定・状態
 ============================================================ */
+// ★ 最重要：state の初期化（これが無いと全部 undefined になる）
+let state = {
+  mode: null,               // 例：4v4 / 6v6 / 12v12
+  teams: [],                // チーム名一覧
+  teamSizeMap: {},          // チームごとの人数
+  teamRanks: {},            // teamRanks[team][round] = [rank1, rank2, ...]
+  courseNames: {},          // ラウンドごとのコース名
+  penalty: {},              // チームごとのペナルティ
+  myTeam: null,             // 自チーム
+  enemyTeams: [],           // 敵チーム一覧
+  totalRounds: 12           // ラウンド数
+};
 
+  
 const totalRounds = 12;
 const courseList = [
   "マリオブラザーズサーキット",
@@ -1330,6 +1343,16 @@ function loadBackgroundImage(file) {
 }
 
 
+function initTeamRanks() {
+  state.teamRanks = {};
+
+  for (const team of state.teams) {
+    state.teamRanks[team] = [];
+    for (let r = 0; r < state.totalRounds; r++) {
+      state.teamRanks[team][r] = [];
+    }
+  }
+}
 
 /* ============================================================
    集計機能
