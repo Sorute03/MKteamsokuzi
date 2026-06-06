@@ -2368,7 +2368,7 @@ function sendHistoryToGAS() {
   alert("共有保存（GAS）はまだ実装されていません");
 }
 
-const OVERLAY_GAS_URL = "https://script.google.com/macros/s/AKfycbxL13mpCH0rOrkVw_mAi04Ni9RfO5doTvZ5w-JtZOvbfph5WJR0fLjjf09RyBY9wCkk/exec"; // ← あなたの GAS URL
+const OVERLAY_GAS_URL = "https://script.google.com/macros/s/AKfycbwAeZpFTsU6L3UxfLWCl95aNJSrWd0EG4rEn9VgvKPWswenSONkdM7smN0_UWgSWTVs/exec"; // ← あなたの GAS URL
 
 // ▼ 送信用チャンネルを作成
 const bc = new BroadcastChannel("mk_overlay");
@@ -2387,7 +2387,7 @@ function openOverlayWindow() {
 }
 
 async function sendOverlay(payload) {
-  await fetch("https://script.google.com/macros/s/AKfycbxL13mpCH0rOrkVw_mAi04Ni9RfO5doTvZ5w-JtZOvbfph5WJR0fLjjf09RyBY9wCkk/exec", {
+  await fetch("https://script.google.com/macros/s/AKfycbwAeZpFTsU6L3UxfLWCl95aNJSrWd0EG4rEn9VgvKPWswenSONkdM7smN0_UWgSWTVs/exec", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
