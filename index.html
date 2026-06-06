@@ -2435,26 +2435,22 @@ function openOverlayWindow() {
   overlayWin = window.open("overlay.html", "overlayWindow");
 }
 
-async function sendOverlay() {
+function sendOverlay() {
   const payload = buildOverlayPayload();
-
-  if (!payload) {
-    console.warn("sendOverlay: payload が生成できませんでした");
-    return;
-  }
+  if (!payload) return;
 
   console.log("送信前 payload:", payload);
 
+  // GAS に送信（今まで通り）
   const form = new FormData();
+  form.append("payload", JSON.stringify(payload));
+  fetch(GAS_URL, { method: "POST", body: form, mode: "no-cors" });
 
-  // ★ ここが重要：壊れないようにエンコードして送る
-  form.append("payload", encodeURIComponent(JSON.stringify(payload)));
-
-  await fetch(GAS_URL, {
-    method: "POST",
-    body: form,
-    mode: "no-cors"
-  });
+  // ★ iframe にも postMessage で送信
+  const frame = document.getElementById("overlayFrame");
+  if (frame && frame.contentWindow) {
+    frame.contentWindow.postMessage({ type: "overlay", payload }, "*");
+  }
 }
 
 
