@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>GAS Log Viewer</title>
+<style>
+body {
+  font-family: monospace;
+  background: #111;
+  color: #eee;
+  padding: 20px;
+}
+.log-entry {
+  background: #222;
+  padding: 10px;
+  margin-bottom: 10px;
+  border-left: 4px solid #4caf50;
+}
+.time {
+  color: #4caf50;
+  font-weight: bold;
+}
+pre {
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+</style>
+</head>
+<body>
+
+<h2>GAS Log Viewer</h2>
+<div id="logs">読み込み中...</div>
+
+<script>
+const GAS_URL = "https://script.google.com/macros/s/AKfycbw9mZJGnCFMgNlBaY8AA8BNKrmxDBeKDHyI622GKpaJn1DEKvBEON4wexP1Q2nM6y_I/exec?log=1";
+
+async function loadLogs() {
+  try {
+    const res = await fetch(GAS_URL);
+    const logs = await res.json();
+
+    let html = "";
+    logs.forEach(entry => {
+      html += `
+        <div class="log-entry">
+          <div class="time">${entry.time}</div>
+          <pre>${JSON.stringify(entry.data, null, 2)}</pre>
+        </div>
+      `;
+    });
+
+    document.getElementById("logs").innerHTML = html;
+
+  } catch (err) {
+    document.getElementById("logs").innerText = "ログ取得エラー: " + err;
+  }
+}
+
+// 初回読み込み
+loadLogs();
+
+// 5秒ごとに更新
+setInterval(loadLogs, 5000);
+</script>
+
+</body>
+</html>
