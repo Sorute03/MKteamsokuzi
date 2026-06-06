@@ -303,17 +303,7 @@ body.overlay-mode #tabs {
    基本設定・状態
 ============================================================ */
 // ★ 最重要：state の初期化（これが無いと全部 undefined になる）
-let state = {
-  mode: null,               // 例：4v4 / 6v6 / 12v12
-  teams: [],                // チーム名一覧
-  teamSizeMap: {},          // チームごとの人数
-  teamRanks: {},            // teamRanks[team][round] = [rank1, rank2, ...]
-  courseNames: {},          // ラウンドごとのコース名
-  penalty: {},              // チームごとのペナルティ
-  myTeam: null,             // 自チーム
-  enemyTeams: [],           // 敵チーム一覧
-  totalRounds: 12           // ラウンド数
-};
+
 
   
 const totalRounds = 12;
@@ -579,6 +569,22 @@ const state = {
   /* ★ ここに追加 */
   backgroundImage: null
 };
+
+window.state = {
+  mode: "6v6",
+  teams: ["チーム1","チーム2","チーム3","チーム4"],
+  myTeam: "チーム1",
+  enemyTeams: ["チーム2","チーム3","チーム4"],
+  courseList: courseList,
+  teamSizeMap: {},
+  teamRanks: {},
+  courseNames: Array(totalRounds).fill(""),
+  penalty: {},
+  currentRound: 0,
+  timestamp: null,
+  backgroundImage: null
+};
+
 
 /* ============================================================
    IndexedDB（history）
