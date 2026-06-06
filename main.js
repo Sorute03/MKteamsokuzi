@@ -2086,32 +2086,17 @@ function openOverlayWindow() {
   overlayWin = window.open("overlay.html", "overlayWindow");
 }
 
-function sendOverlay() {
-  const payload = {
-    type: "overlay",
-    timestamp: state.timestamp || Date.now(),
-    teams: state.teams,
-    scores: calculateTeamScores(),
-    myTeam: state.myTeam,
-    enemyTeams: state.enemyTeams,
-    courses: state.courseNames,
-    teamRanks: state.teamRanks,
-    penalty: state.penalty
-  };
+async function sendOverlay(payload) {
+  await fetch("https://script.google.com/macros/s/AKfycbxl4y2BTq-aUgMsTNEXsB5UTulSSK_CKA2nsnTdWPtK0pkJJMtM59gVnfmxCAI4w806/exec", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    mode: "no-cors"   // ★ GAS は CORS 不可なので必須
+  });
 
-  console.log("送信するpayload:", payload);
-
-  // ▼ ① iframe に送る（存在する場合）
-  const iframe = document.getElementById("overlayFrame");
-  if (iframe && iframe.contentWindow) {
-    iframe.contentWindow.postMessage(payload, "*");
-  }
-
-  // ▼ ② window.open で開いた overlay.html に送る（OBS / ローカル単体）
-  if (overlayWin && !overlayWin.closed) {
-    overlayWin.postMessage(payload, "*");
-  }
+  console.log("GAS へ送信完了");
 }
+
 
 /* ============================================================
    タブ初期化・起動
