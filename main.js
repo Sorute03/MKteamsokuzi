@@ -2123,7 +2123,13 @@ function openOverlayWindow() {
 
 async function sendOverlay() {
   const payload = buildOverlayPayload();
-  if (!payload) return;
+
+  if (!payload) {
+    console.warn("sendOverlay: payload が生成できませんでした");
+    return;
+  }
+
+  console.log("送信前 payload:", payload);
 
   const form = new FormData();
   form.append("payload", JSON.stringify(payload));
