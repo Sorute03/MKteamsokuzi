@@ -266,6 +266,21 @@ const state = {
   backgroundImage: null
 };
 
+window.state = {
+  mode: "6v6",
+  teams: ["チーム1","チーム2","チーム3","チーム4"],
+  myTeam: "チーム1",
+  enemyTeams: ["チーム2","チーム3","チーム4"],
+  courseList: courseList,
+  teamSizeMap: {},
+  teamRanks: {},
+  courseNames: Array(totalRounds).fill(""),
+  penalty: {},
+  currentRound: 0,
+  timestamp: null,
+  backgroundImage: null
+};
+
 /* ============================================================
    IndexedDB（history）
 ============================================================ */
