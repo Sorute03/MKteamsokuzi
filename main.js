@@ -2062,7 +2062,27 @@ function sendHistoryToGAS() {
   alert("共有保存（GAS）はまだ実装されていません");
 }
 
-const OVERLAY_GAS_URL = "https://script.google.com/macros/s/AKfycbw6V8r0QeDs6PTzgU_tC0mWe6vOojWAB6_Rfj1Q7KBcf2htcZNSnHFkB9F1ENi-BRuc/exec"; // ← あなたの GAS URL
+const GAS_URL = "https://script.google.com/macros/s/AKfycbw6V8r0QeDs6PTzgU_tC0mWe6vOojWAB6_Rfj1Q7KBcf2htcZNSnHFkB9F1ENi-BRuc/exec"; // ← あなたの GAS URL
+
+function buildOverlayPayload() {
+  if (!window.state) {
+    console.warn("state が存在しません");
+    return null;
+  }
+
+  return {
+    type: "overlay",
+    timestamp: Date.now(),
+    teams: state.teams || [],
+    teamRanks: state.teamRanks || [],
+    myTeam: state.myTeam || null,
+    enemyTeams: state.enemyTeams || [],
+    courses: state.courses || [],
+    penalty: state.penalty || 0,
+    scores: calculateTeamScores() || {}
+  };
+}
+
 
 // ▼ 送信用チャンネルを作成
 const bc = new BroadcastChannel("mk_overlay");
@@ -2086,17 +2106,26 @@ function openOverlayWindow() {
   overlayWin = window.open("overlay.html", "overlayWindow");
 }
 
-async function sendOverlay(payload) {
-   console.log("送信前 payload:", payload);
-  await fetch("https://script.google.com/macros/s/AKfycbw6V8r0QeDs6PTzgU_tC0mWe6vOojWAB6_Rfj1Q7KBcf2htcZNSnHFkB9F1ENi-BRuc/exec", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-    mode: "no-cors"   // ★ GAS は CORS 不可なので必須
-  });
+async function sendOverlay() {
+  const payload = buildOverlayPayload();
 
-  console.log("GAS へ送信完了");
+  if (!payload) {
+    console.warn("sendOverlay: payload が null のため送信しません");
+    return;
+  }
+
+  console.log("送信前 payload:", payload);
+
+  const form = new FormData();
+  form.append("payload", JSON.stringify(payload));
+
+  await fetch(GAS_URL, {
+    method: "POST",
+    body: form,
+    mode: "no-cors"
+  });
 }
+
 
 
 /* ============================================================
