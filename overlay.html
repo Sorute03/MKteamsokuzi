@@ -36,32 +36,32 @@ body {
 <div id="overlay">待機中...</div>
 
 <script>
-// 親にデータ要求（少し待ってから）
-setTimeout(() => {
-  window.parent.postMessage({ type: "requestOverlay" }, "*");
-}, 300);
+// ▼ GAS の URL（あなたのデプロイURLに置き換える）
+const GAS_URL = "https://script.google.com/macros/s/AKfycbxl4y2BTq-aUgMsTNEXsB5UTulSSK_CKA2nsnTdWPtK0pkJJMtM59gVnfmxCAI4w806/exec";
 
-// 親から受信
-window.addEventListener("message", (event) => {
-  const data = event.data;
-  if (!data || data.type !== "overlay") return;
+// ▼ GAS から overlay データを取得
+async function fetchOverlayFromGAS() {
+  try {
+    const res = await fetch(GAS_URL, { method: "GET" });
+    const data = await res.json();
 
-  console.log("受信したpayload:", data);
-  updateOverlayUI(data);
-});
-
-function getTargetWindow() {
-  if (window.opener) return window.opener; // OBS / ローカル単体
-  if (window.parent && window.parent !== window) return window.parent; // iframe
-  return null;
+    if (data && data.type === "overlay") {
+      console.log("GAS から取得:", data);
+      updateOverlayUI(data);
+    }
+  } catch (err) {
+    console.warn("GAS 取得エラー:", err);
+  }
 }
 
-setTimeout(() => {
-  const target = getTargetWindow();
-  target?.postMessage({ type: "requestOverlay" }, "*");
-}, 300);
+// ▼ 5秒ごとにポーリング
+setInterval(fetchOverlayFromGAS, 5000);
 
-// UI 更新：scores は「チーム名キーのオブジェクト」として扱う
+// ▼ 初回即時実行
+fetchOverlayFromGAS();
+
+
+// ▼ UI 更新：scores は「チーム名キーのオブジェクト」として扱う
 function updateOverlayUI(data) {
   const teams = data.teams.map(name => ({
     name,
