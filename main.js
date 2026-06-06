@@ -2132,7 +2132,9 @@ async function sendOverlay() {
   console.log("送信前 payload:", payload);
 
   const form = new FormData();
-  form.append("payload", JSON.stringify(payload));
+
+  // ★ ここが重要：壊れないようにエンコードして送る
+  form.append("payload", encodeURIComponent(JSON.stringify(payload)));
 
   await fetch(GAS_URL, {
     method: "POST",
@@ -2140,6 +2142,7 @@ async function sendOverlay() {
     mode: "no-cors"
   });
 }
+
 
 
 
