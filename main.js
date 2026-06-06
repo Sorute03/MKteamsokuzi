@@ -2110,7 +2110,7 @@ async function sendOverlay() {
   const payload = buildOverlayPayload();
 
   if (!payload) {
-    console.warn("sendOverlay: payload が null のため送信しません");
+    console.warn("sendOverlay: payload が生成できませんでした");
     return;
   }
 
