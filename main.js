@@ -2125,19 +2125,16 @@ async function sendOverlay() {
   const payload = buildOverlayPayload();
   if (!payload) return;
 
-  console.log("送信前 payload:", payload);
-
-  const body = new URLSearchParams();
-  body.append("payload", JSON.stringify(payload));
+  const form = new FormData();
+  form.append("payload", JSON.stringify(payload));
 
   await fetch(GAS_URL, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded"
-    },
-    body: body.toString()
+    body: form,
+    mode: "no-cors"
   });
 }
+
 
 
 
