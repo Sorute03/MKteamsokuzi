@@ -36,13 +36,17 @@ body {
 <div id="overlay">待機中...</div>
 
 <script>
+// ▼ GAS の URL
 const GAS_URL = "https://script.google.com/macros/s/AKfycbw6V8r0QeDs6PTzgU_tC0mWe6vOojWAB6_Rfj1Q7KBcf2htcZNSnHFkB9F1ENi-BRuc/exec";
 
-// ▼ GAS から overlay データを取得
+/* ---------------------------------------------------------
+   ① GAS から overlay データを取得（5秒ごと）
+--------------------------------------------------------- */
 async function fetchOverlayFromGAS() {
   try {
     const res = await fetch(GAS_URL + "?t=" + Date.now());
     const data = await res.json();
+
     if (data && data.type === "overlay") {
       renderOverlay(data);
     }
@@ -51,14 +55,28 @@ async function fetchOverlayFromGAS() {
   }
 }
 
-// ▼ 親ページからの postMessage を受信
+setInterval(fetchOverlayFromGAS, 5000);
+fetchOverlayFromGAS();
+
+/* ---------------------------------------------------------
+   ② 親ページ（sokuzi.html）からの postMessage を受信
+--------------------------------------------------------- */
 window.addEventListener("message", (event) => {
   if (!event.data || event.data.type !== "overlay") return;
+
+  // event.data は { type:"overlay", ...payload }
   renderOverlay(event.data);
 });
 
-// ▼ UI 更新関数
+/* ---------------------------------------------------------
+   ③ UI 更新（GAS / postMessage 共通）
+--------------------------------------------------------- */
 function renderOverlay(data) {
+  if (!data.teams || !data.scores) {
+    document.getElementById("overlay").textContent = "データ待機中...";
+    return;
+  }
+
   const teams = data.teams.map(name => ({
     name,
     score: data.scores?.[name] ?? 0
@@ -74,10 +92,6 @@ function renderOverlay(data) {
 
   document.getElementById("overlay").innerHTML = html;
 }
-
-// ▼ 5秒ごとに GAS ポーリング
-setInterval(fetchOverlayFromGAS, 5000);
-fetchOverlayFromGAS();
 </script>
 
 </body>
