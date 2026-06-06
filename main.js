@@ -2123,23 +2123,22 @@ function openOverlayWindow() {
 
 async function sendOverlay() {
   const payload = buildOverlayPayload();
-
-  if (!payload) {
-    console.warn("sendOverlay: payload が生成できませんでした");
-    return;
-  }
+  if (!payload) return;
 
   console.log("送信前 payload:", payload);
 
-  const form = new FormData();
-  form.append("payload", JSON.stringify(payload));
+  const body = new URLSearchParams();
+  body.append("payload", JSON.stringify(payload));
 
   await fetch(GAS_URL, {
     method: "POST",
-    body: form,
-    mode: "no-cors"
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded"
+    },
+    body: body.toString()
   });
 }
+
 
 
 
