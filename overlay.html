@@ -36,55 +36,48 @@ body {
 <div id="overlay">待機中...</div>
 
 <script>
-// ▼ GAS の URL（あなたのデプロイURLに置き換える）
 const GAS_URL = "https://script.google.com/macros/s/AKfycbw6V8r0QeDs6PTzgU_tC0mWe6vOojWAB6_Rfj1Q7KBcf2htcZNSnHFkB9F1ENi-BRuc/exec";
 
 // ▼ GAS から overlay データを取得
 async function fetchOverlayFromGAS() {
   try {
-    const res = await fetch(GAS_URL, { method: "GET" });
+    const res = await fetch(GAS_URL + "?t=" + Date.now());
     const data = await res.json();
-
     if (data && data.type === "overlay") {
-      console.log("GAS から取得:", data);
-      updateOverlayUI(data);
+      renderOverlay(data);
     }
   } catch (err) {
     console.warn("GAS 取得エラー:", err);
   }
 }
 
-// ▼ 5秒ごとにポーリング
-setInterval(fetchOverlayFromGAS, 5000);
+// ▼ 親ページからの postMessage を受信
+window.addEventListener("message", (event) => {
+  if (!event.data || event.data.type !== "overlay") return;
+  renderOverlay(event.data);
+});
 
-// ▼ 初回即時実行
-fetchOverlayFromGAS();
-
-
-// ▼ UI 更新：scores は「チーム名キーのオブジェクト」として扱う
-function updateOverlayUI(data) {
+// ▼ UI 更新関数
+function renderOverlay(data) {
   const teams = data.teams.map(name => ({
     name,
-    score: data.scores[name] ?? 0
+    score: data.scores?.[name] ?? 0
   }));
 
-  // スコア順にソート
   teams.sort((a, b) => b.score - a.score);
 
   let html = "<div style='display:flex; gap:20px;'>";
-
   for (let i = 0; i < teams.length; i++) {
-    html += `
-      <span class="team">
-        ${i+1}位 ${teams[i].name}：${teams[i].score}点
-      </span>
-    `;
+    html += `<span class="team">${i+1}位 ${teams[i].name}：${teams[i].score}点</span>`;
   }
-
   html += "</div>";
 
   document.getElementById("overlay").innerHTML = html;
 }
+
+// ▼ 5秒ごとに GAS ポーリング
+setInterval(fetchOverlayFromGAS, 5000);
+fetchOverlayFromGAS();
 </script>
 
 </body>
