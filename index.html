@@ -2506,6 +2506,52 @@ function sendOverlay() {
   );
 }
 
+    
+
+async function restoreFromRecords(records, meta = {}) {
+  // ▼ 1. allRecords を更新
+  allRecords = Array.isArray(records) ? records : [];
+  localStorage.setItem("allRecords", JSON.stringify(allRecords));
+
+  // ▼ 2. チーム一覧を再生成
+  state.teams = Array.from(
+    new Set(allRecords.map(r => r.team).filter(Boolean))
+  );
+
+  // ▼ 3. myTeam を復元（優先順位：meta → CSV → IndexedDB → localStorage）
+  if (meta.myTeam) {
+    state.myTeam = meta.myTeam;
+  } else {
+    // CSV に myTeam 列がある場合
+    const first = allRecords.find(r => r.myTeam);
+    if (first) {
+      state.myTeam = first.myTeam;
+    } else {
+      // ▼ IndexedDB から読み込む（ここが重要）
+      const dbMyTeam = await db.get("myTeam");
+      if (dbMyTeam) {
+        state.myTeam = dbMyTeam;
+      } else {
+        // 最後の fallback
+        state.myTeam = localStorage.getItem("myTeam") || "";
+      }
+    }
+  }
+
+  // ▼ 4. myTeam を保存
+  localStorage.setItem("myTeam", state.myTeam);
+  db.put("myTeam", state.myTeam);
+
+  // ▼ 5. UI 更新
+  initTeamAnalysisUI();
+  refreshAllAnalysisViews();
+  renderRaceHistory();
+
+  console.log("restore 完了:", {
+    teams: state.teams,
+    myTeam: state.myTeam
+  });
+}
 
 
 
