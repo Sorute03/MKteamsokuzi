@@ -1566,13 +1566,24 @@ async function sendInstantScoreMulti(silent = false) {
 function initTeamAnalysisUI() {
   const sel = document.getElementById("analysisTeamSelect");
   if (!sel) return;
-  if (!state.teams || state.teams.length === 0) return;
 
-  sel.innerHTML = state.teams
+  const teams = [...state.teams];
+
+  // ▼ myTeam を先頭に追加（重複しないように）
+  if (state.myTeam && !teams.includes(state.myTeam)) {
+    teams.unshift(state.myTeam);
+  }
+
+  // ▼ UI に反映
+  sel.innerHTML = teams
     .map(t => `<option value="${t}">${t}</option>`)
     .join("");
 
-  // 初期表示
+  // ▼ myTeam を選択状態にする
+  if (state.myTeam) {
+    sel.value = state.myTeam;
+  }
+
   updateTeamAnalysis();
 }
 
