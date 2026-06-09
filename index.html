@@ -81,8 +81,16 @@ body.overlay-mode #tabs {
             background: transparent;
           ">
   </iframe>
+<input id="overlayUser" placeholder="ユーザー名">
+<button onclick="openOverlay()">オーバーレイを開く</button>
+
+<iframe id="overlayFrame" style="width:100%; height:600px; border:none;"></iframe>
 
 </div>
+<input id="overlayUser" placeholder="ユーザー名">
+<button onclick="openOverlay()">オーバーレイを開く</button>
+
+<iframe id="overlayFrame" style="width:100%; height:600px; border:none;"></iframe>
 
 <!-- 入力タブ -->
 <div id="inputTab" class="tabContent" style="display:block;">
@@ -2437,6 +2445,14 @@ function openOverlayWindow() {
   overlayWin = window.open("overlay.html", "overlayWindow");
 }
 
+function openOverlay() {
+  const user = document.getElementById("overlayUser").value.trim();
+  if (!user) return alert("ユーザー名を入力してください");
+
+  document.getElementById("overlayFrame").src =
+    `overlay.html?user=${encodeURIComponent(user)}`;
+}
+
 async function sendOverlay() {
   const payload = buildOverlayPayload();
 
@@ -2447,6 +2463,10 @@ async function sendOverlay() {
 
   console.log("送信前 payload:", payload);
 
+  // ▼ ユーザー名（HTML の input などから取得）
+  const user = document.getElementById("overlayUser")?.value?.trim() || "default";
+  payload.user = user; // ★ payload にユーザー名を付与
+
   // ▼ GAS に送信（今まで通り）
   const form = new FormData();
   form.append("payload", JSON.stringify(payload));
@@ -2456,12 +2476,20 @@ async function sendOverlay() {
     mode: "no-cors"
   });
 
-  // ▼ overlay.html (iframe) にも postMessage で送信
+  // ▼ overlay.html (iframe) にも postMessage で送信（ユーザー名付き）
   const frame = document.getElementById("overlayFrame");
   if (frame && frame.contentWindow) {
-    frame.contentWindow.postMessage({ type: "overlay", ...payload }, "*");
+    frame.contentWindow.postMessage(
+      {
+        type: "overlay",
+        user,     // ★ ここでもユーザー名を付ける
+        payload   // ★ データ本体
+      },
+      "*"
+    );
   }
 }
+
 
 
 
