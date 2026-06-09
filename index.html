@@ -705,6 +705,8 @@ function calcScoresFromRecord(rec) {
 }
 
 
+
+
 /* ============================================================
    重複チェック
 ============================================================ */
@@ -1604,6 +1606,35 @@ function initTeamAnalysisUI() {
   updateTeamAnalysis();
 }
 
+function getTeamsFoughtWith(myTeam) {
+  const set = new Set();
+
+  for (const raceId in state.teamRanks) {
+    const teams = Object.keys(state.teamRanks[raceId]);
+    if (!teams.includes(myTeam)) continue;
+
+    teams.forEach(t => {
+      if (t !== myTeam) set.add(t);
+    });
+  }
+
+  return Array.from(set);
+}
+
+
+function getRacesOfTeam(myTeam) {
+  const list = [];
+
+  for (const raceId in state.teamRanks) {
+    const teams = Object.keys(state.teamRanks[raceId]);
+    if (teams.includes(myTeam)) list.push(raceId);
+  }
+
+  return list;
+}
+
+
+  
 function calcStdDev(values) {
   if (!values || values.length === 0) return 0;
   const avg = values.reduce((a, b) => a + b, 0) / values.length;
@@ -1644,102 +1675,83 @@ function calcCourseStats(team) {
   return stats;
 }
 
-function calcOpponentStats(team) {
-  const enemyTeams = getEnemyTeamsOnly();  // ★ 相手チームだけ取得
+function calcOpponentStats(myTeam) {
+  const enemies = getTeamsFoughtWith(myTeam);
+  const races = getRacesOfTeam(myTeam);
+
   const stats = {};
+  enemies.forEach(t => stats[t] = { count: 0, wins: 0, scoreDiff: 0 });
 
-  // ▼ 相手チームだけ初期化
-  for (const opp of enemyTeams) {
-    if (opp === team) continue;
+  for (const raceId of races) {
+    const ranks = state.teamRanks[raceId];
+    const myRank = ranks[myTeam];
 
-    stats[opp] = {
-      count: 0,
-      wins: 0,
-      scoreDiff: 0
-    };
-  }
-
-  const myRecords = state.teamRanks[team] || [];
-
-  // ▼ 相手チームだけ比較
-  for (const r of myRecords) {
-    for (const opp of enemyTeams) {
-      if (opp === team) continue;
-
-      const oppRecord = state.teamRanks[opp]?.find(x => x.raceId === r.raceId);
-      if (!oppRecord) continue;
+    for (const opp of enemies) {
+      const oppRank = ranks[opp];
+      if (oppRank == null) continue;
 
       stats[opp].count++;
-      if (r.rank < oppRecord.rank) stats[opp].wins++;
-      stats[opp].scoreDiff += (r.score - oppRecord.score);
+      if (myRank < oppRank) stats[opp].wins++;
+      stats[opp].scoreDiff += (oppRank - myRank);
     }
   }
 
   return stats;
 }
 
-function calcCourseOpponentMatrix(team) {
-  const enemyTeams = getEnemyTeamsOnly();  // ★ 相手チームだけ取得
+
+function calcCourseOpponentMatrix(myTeam) {
+  const enemies = getTeamsFoughtWith(myTeam);
   const matrix = {};
 
-  // ▼ コース × 相手チーム の初期化
-  for (const course of state.courseNames) {
-    matrix[course] = {};
-    for (const opp of enemyTeams) {
-      if (opp === team) continue;
-      matrix[course][opp] = { count: 0, wins: 0 };
-    }
-  }
+  state.courseNames.forEach(c => {
+    matrix[c] = {};
+    enemies.forEach(e => matrix[c][e] = { count: 0, wins: 0 });
+  });
 
-  const myRecords = state.teamRanks[team] || [];
+  for (const raceId in state.teamRanks) {
+    const race = state.races[raceId];
+    if (!race || race.myTeam !== myTeam) continue;
 
-  // ▼ 自チーム vs 相手チーム の比較
-  for (const r of myRecords) {
-    const course = r.course;
+    const course = race.course;
+    const ranks = state.teamRanks[raceId];
+    const myRank = ranks[myTeam];
 
-    for (const opp of enemyTeams) {
-      if (opp === team) continue;
+    for (const opp of enemies) {
+      const oppRank = ranks[opp];
+      if (oppRank == null) continue;
 
-      const oppRecord = state.teamRanks[opp]?.find(x => x.raceId === r.raceId);
-      if (!oppRecord) continue;
-
-      const cell = matrix[course][opp];
-      cell.count++;
-      if (r.rank < oppRecord.rank) cell.wins++;
+      matrix[course][opp].count++;
+      if (myRank < oppRank) matrix[course][opp].wins++;
     }
   }
 
   return matrix;
 }
-  
-function calcCourseOpponentScoreDiffMatrix(team) {
-  const enemyTeams = getEnemyTeamsOnly();  // ★ 相手チームだけ取得
+
+function calcCourseOpponentScoreDiffMatrix(myTeam) {
+  const enemies = getTeamsFoughtWith(myTeam);
   const matrix = {};
 
-  // ▼ コース × 相手チーム の初期化
-  for (const course of state.courseNames) {
-    matrix[course] = {};
-    for (const opp of enemyTeams) {
-      if (opp === team) continue;
-      matrix[course][opp] = { count: 0, scoreDiff: 0 };
-    }
-  }
+  state.courseNames.forEach(c => {
+    matrix[c] = {};
+    enemies.forEach(e => matrix[c][e] = { count: 0, scoreDiff: 0 });
+  });
 
-  const myRecords = state.teamRanks[team] || [];
+  for (const raceId in state.teamRanks) {
+    const race = state.races[raceId];
+    if (!race || race.myTeam !== myTeam) continue;
 
-  // ▼ 自チーム vs 相手チーム の比較
-  for (const r of myRecords) {
-    const course = r.course;
+    const course = race.course;
+    const ranks = state.teamRanks[raceId];
+    const myRank = ranks[myTeam];
 
-    for (const opp of enemyTeams) {
-      if (opp === team) continue;
+    for (const opp of enemies) {
+      const oppRank = ranks[opp];
+      if (oppRank == null) continue;
 
-      const oppRecord = state.teamRanks[opp]?.find(x => x.raceId === r.raceId);
-      if (!oppRecord) continue;
-
-      const cell = matrix[course][opp];
-      cell.count++;
-      cell.scoreDiff += (r.score - oppRecord.score);
+      matrix[course][opp].count++;
+      matrix[course][opp].scoreDiff += (oppRank - myRank);
     }
   }
 
@@ -1835,11 +1847,11 @@ function renderCourseStats(stats) {
   table.innerHTML = html;
 }
 
-function renderOpponentStats(stats) {
+function renderOpponentStats(stats, myTeam) {
   const table = document.getElementById("tableOpponentStats");
   if (!table) return;
 
-  const enemyTeams = getEnemyTeamsOnly();  // ★ 相手チームだけ取得
+  const enemies = getTeamsFoughtWith(myTeam);
 
   let html = `
     <tr>
@@ -1850,7 +1862,7 @@ function renderOpponentStats(stats) {
     </tr>
   `;
 
-  for (const opp of enemyTeams) {  // ★ 相手チームだけループ
+  for (const opp of enemies) {
     const s = stats[opp];
     if (!s || s.count === 0) continue;
 
@@ -1867,27 +1879,25 @@ function renderOpponentStats(stats) {
   table.innerHTML = html;
 }
 
-
-function renderCourseOpponentMatrix(matrix) {
+function renderCourseOpponentMatrix(matrix, myTeam) {
   const table = document.getElementById("tableCourseOpponentMatrix");
   if (!table) return;
 
-  const enemyTeams = getEnemyTeamsOnly();  // ★ 相手チームだけ取得
+  const enemies = getTeamsFoughtWith(myTeam);
 
   let html = "<tr><th>コース</th>";
-  for (const opp of enemyTeams) html += `<th>${opp}</th>`;  // ★ 相手チームだけ
+  enemies.forEach(e => html += `<th>${e}</th>`);
   html += "</tr>";
 
   for (const course of state.courseNames) {
     html += `<tr><td>${course}</td>`;
 
-    for (const opp of enemyTeams) {  // ★ 相手チームだけ
+    for (const opp of enemies) {
       const cell = matrix[course][opp];
       if (!cell || cell.count === 0) {
         html += "<td>-</td>";
         continue;
       }
-
       html += `<td>${(cell.wins / cell.count * 100).toFixed(1)}%</td>`;
     }
 
@@ -1897,26 +1907,26 @@ function renderCourseOpponentMatrix(matrix) {
   table.innerHTML = html;
 }
 
-function renderCourseOpponentScoreDiffMatrix(matrix) {
+
+function renderCourseOpponentScoreDiffMatrix(matrix, myTeam) {
   const table = document.getElementById("tableCourseOpponentScoreDiffMatrix");
   if (!table) return;
 
-  const { enemyTeams } = getLatestTeams();
+  const enemies = getTeamsFoughtWith(myTeam);
 
   let html = "<tr><th>コース</th>";
-  for (const opp of enemyTeams) html += `<th>${opp}</th>`;
+  enemies.forEach(e => html += `<th>${e}</th>`);
   html += "</tr>";
 
   for (const course of state.courseNames) {
     html += `<tr><td>${course}</td>`;
 
-    for (const opp of enemyTeams) {
+    for (const opp of enemies) {
       const cell = matrix[course][opp];
       if (!cell || cell.count === 0) {
         html += "<td>-</td>";
         continue;
       }
-
       html += `<td>${(cell.scoreDiff / cell.count).toFixed(2)}</td>`;
     }
 
@@ -1926,24 +1936,27 @@ function renderCourseOpponentScoreDiffMatrix(matrix) {
   table.innerHTML = html;
 }
 
+
 let courseRadarChart = null;
 
-function buildCourseRadarData(team) {
-  const stats = calcCourseStats(team);
+function buildOpponentRadarData(myTeam) {
+  const stats = calcOpponentStats(myTeam);
+  const enemies = getTeamsFoughtWith(myTeam);
 
   return {
-    labels: state.courseNames,
+    labels: enemies,
     datasets: [{
-      label: `${team} 平均得点`,
-      data: state.courseNames.map(c => {
-        const s = stats[c];
-        return s.count ? (s.totalScore / s.count) : 0;
+      label: `${myTeam} vs 相手チーム 平均得点差`,
+      data: enemies.map(opp => {
+        const s = stats[opp];
+        return s.count ? (s.scoreDiff / s.count) : 0;
       }),
-      borderColor: "rgba(255,99,132,1)",
-      backgroundColor: "rgba(255,99,132,0.2)"
+      borderColor: "rgba(54,162,235,1)",
+      backgroundColor: "rgba(54,162,235,0.2)"
     }]
   };
 }
+
 
 function renderCourseRadar(team) {
   const ctx = document.getElementById("chartCourseRadar").getContext("2d");
@@ -1995,32 +2008,28 @@ function renderOpponentRadar(team) {
   });
 }
 
-function buildCourseOpponentHeatmap(team) {
-  const matrix = calcCourseOpponentScoreDiffMatrix(team);
-  const enemyTeams = getEnemyTeamsOnly();  // ★ 相手チームだけ取得
+function buildCourseOpponentHeatmap(myTeam) {
+  const matrix = calcCourseOpponentScoreDiffMatrix(myTeam);
+  const enemies = getTeamsFoughtWith(myTeam);
   const data = [];
 
-  state.courseNames.forEach((course, i) => {
-    enemyTeams.forEach((opp, j) => {  // ★ 相手チームだけループ
+  state.courseNames.forEach(course => {
+    enemies.forEach(opp => {
       const cell = matrix[course][opp];
       const value = cell && cell.count ? (cell.scoreDiff / cell.count) : 0;
 
-      data.push({
-        x: opp,
-        y: course,
-        v: value
-      });
+      data.push({ x: opp, y: course, v: value });
     });
   });
 
   return data;
 }
 
-function renderCourseOpponentHeatmap(team) {
-  const ctx = document.getElementById("chartCourseOpponentHeatmap").getContext("2d");
-  const data = buildCourseOpponentHeatmap(team);
 
-  const enemyTeams = getEnemyTeamsOnly();  // ★ 相手チームだけ取得
+function renderCourseOpponentHeatmap(myTeam) {
+  const ctx = document.getElementById("chartCourseOpponentHeatmap").getContext("2d");
+  const data = buildCourseOpponentHeatmap(myTeam);
+  const enemies = getTeamsFoughtWith(myTeam);
 
   if (heatmapChart) heatmapChart.destroy();
 
@@ -2034,13 +2043,13 @@ function renderCourseOpponentHeatmap(team) {
           const v = ctx.dataset.data[ctx.dataIndex].v;
           return v > 0 ? "rgba(0,200,0,0.6)" : "rgba(200,0,0,0.6)";
         },
-        width: ({chart}) => (chart.chartArea.width / enemyTeams.length),   // ★ 修正
+        width: ({chart}) => (chart.chartArea.width / enemies.length),
         height: ({chart}) => (chart.chartArea.height / state.courseNames.length)
       }]
     },
     options: {
       scales: {
-        x: { type: "category", labels: enemyTeams },  // ★ 修正
+        x: { type: "category", labels: enemies },
         y: { type: "category", labels: state.courseNames }
       }
     }
@@ -2050,30 +2059,31 @@ function renderCourseOpponentHeatmap(team) {
 function updateTeamAnalysis() {
   const sel = document.getElementById("analysisTeamSelect");
   if (!sel) return;
-  const team = sel.value;
-  if (!team) return;
+  const myTeam = sel.value;
+  if (!myTeam) return;
 
-  const courseStats = calcCourseStats(team);
-  const oppStats = calcOpponentStats(team);
-  const matrix = calcCourseOpponentMatrix(team);
-  const scoreMatrix = calcCourseOpponentScoreDiffMatrix(team);
-  const ranking = calcCourseStrengthRanking(team);
-  const stability = calcStabilityRanking(team);
+  const courseStats = calcCourseStats(myTeam);
+  const oppStats = calcOpponentStats(myTeam);
+  const matrix = calcCourseOpponentMatrix(myTeam);
+  const scoreMatrix = calcCourseOpponentScoreDiffMatrix(myTeam);
+  const ranking = calcCourseStrengthRanking(myTeam);
+  const stability = calcStabilityRanking(myTeam);
 
   renderCourseStats(courseStats);
-  renderOpponentStats(oppStats);
-  renderCourseOpponentMatrix(matrix);
-  renderCourseOpponentScoreDiffMatrix(scoreMatrix);
+  renderOpponentStats(oppStats, myTeam);
+  renderCourseOpponentMatrix(matrix, myTeam);
+  renderCourseOpponentScoreDiffMatrix(scoreMatrix, myTeam);
 
-  renderCourseRadar(team);
-  renderOpponentRadar(team);
-  renderCourseOpponentHeatmap(team);
+  renderCourseRadar(myTeam);
+  renderOpponentRadar(myTeam);
+  renderCourseOpponentHeatmap(myTeam);
 
   renderStrongCourseRanking(ranking.strong);
   renderWeakCourseRanking(ranking.weak);
   renderStableCourseRanking(stability.stable);
   renderUnstableCourseRanking(stability.unstable);
 }
+
 
 
 /* ============================================================
