@@ -41,12 +41,12 @@ const params = new URLSearchParams(location.search);
 const USER = params.get("user") || "default";
 
 // ▼ GAS の URL（現状維持）
-const GAS_URL = "";
+//const GAS_URL = "";
 
 /* ---------------------------------------------------------
    ① GAS から overlay データを取得（5秒ごと）
 --------------------------------------------------------- */
-async function fetchOverlayFromGAS() {
+`async function fetchOverlayFromGAS() {
   try {
     const res = await fetch(GAS_URL + "?t=" + Date.now());
     const data = await res.json();
@@ -60,7 +60,7 @@ async function fetchOverlayFromGAS() {
 }
 
 setInterval(fetchOverlayFromGAS, 5000);
-fetchOverlayFromGAS();
+fetchOverlayFromGAS();`
 
 /* ---------------------------------------------------------
    ② 親ページ（sokuzi.html）からの postMessage を受信
