@@ -81,15 +81,19 @@ body.overlay-mode #tabs {
             background: transparent;
           ">
   </iframe>
-<button onclick="openOverlayWindow()">オーバーレイを開く</button>
-<input id="overlayUser" placeholder="ユーザー名">
-<button onclick="openOverlay()">オーバーレイを開く</button>
+
 
 
 </div>
+<button onclick="openOverlayWindow()">オーバーレイを開く</button>
+
 
 <!-- 入力タブ -->
 <div id="inputTab" class="tabContent" style="display:block;">
+  <input id="overlayUser" placeholder="ユーザー名">
+  <button onclick="openOverlay()">オーバーレイを開く</button>
+  <iframe id="overlayFrame" style="width:100%; height:600px; border:none;"></iframe>
+  
   <h3>モード設定</h3>
   <div>
     <label>モード：</label>
