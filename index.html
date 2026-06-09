@@ -63,7 +63,9 @@ body.overlay-mode #tabs {
   <button class="tabBtn" data-tab="webhookTab">Webhook</button>
   <button class="tabBtn" data-tab="overlayTab">Overlay</button>
 </div>
-
+<input id="overlayUser" placeholder="ユーザー名">
+<button onclick="openOverlay()">オーバーレイを開く</button>
+<iframe id="overlayFrame" style="width:100%; height:600px; border:none;"></iframe>
 
 <div id="overlayTab" class="tabContent" style="display:none; position:relative; height:600px; background: transparent;">
 
@@ -90,9 +92,6 @@ body.overlay-mode #tabs {
 
 <!-- 入力タブ -->
 <div id="inputTab" class="tabContent" style="display:block;">
-  <input id="overlayUser" placeholder="ユーザー名">
-  <button onclick="openOverlay()">オーバーレイを開く</button>
-  <iframe id="overlayFrame" style="width:100%; height:600px; border:none;"></iframe>
   
   <h3>モード設定</h3>
   <div>
