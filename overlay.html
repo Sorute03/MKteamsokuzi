@@ -36,10 +36,13 @@ body {
 <div id="overlay">待機中...</div>
 
 <script>
-// ▼ GAS の URL
-const GAS_URL = "https://script.google.com/macros/s/AKfycbw6V8r0QeDs6PTzgU_tC0mWe6vOojWAB6_Rfj1Q7KBcf2htcZNSnHFkB9F1ENi-BRuc/exec";
+// ▼ URL パラメータから user を取得（★追加）
 const params = new URLSearchParams(location.search);
 const USER = params.get("user") || "default";
+
+// ▼ GAS の URL（現状維持）
+const GAS_URL = "https://script.google.com/macros/s/AKfycbw6V8r0QeDs6PTzgU_tC0mWe6vOojWAB6_Rfj1Q7KBcf2htcZNSnHFkB9F1ENi-BRuc/exec";
+
 /* ---------------------------------------------------------
    ① GAS から overlay データを取得（5秒ごと）
 --------------------------------------------------------- */
@@ -65,10 +68,13 @@ fetchOverlayFromGAS();
 window.addEventListener("message", (event) => {
   if (!event.data || event.data.type !== "overlay") return;
 
+  // ▼ ★ユーザー名フィルタ（追加）
   if (event.data.user && event.data.user !== USER) return;
 
-  // event.data は { type:"overlay", ...payload }
-  renderOverlay(event.data);
+  // event.data は { type:"overlay", user:"xxx", payload:{...} }
+  const payload = event.data.payload || event.data;
+
+  renderOverlay(payload);
 });
 
 /* ---------------------------------------------------------
