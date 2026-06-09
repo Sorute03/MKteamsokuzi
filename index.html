@@ -2480,29 +2480,35 @@ function openOverlay() {
     `https://sorute03.github.io/MKteamsokuzi/overlay.html?user=${encodeURIComponent(user)}`;
 }
 
-const bc = new BroadcastChannel("overlay_channel");
+function getUser() {
+  return document.getElementById("overlayUser")?.value?.trim() || "default";
+}
 
 function sendOverlay() {
   const payload = buildOverlayPayload();
   if (!payload) return;
 
-  const user = document.getElementById("overlayUser")?.value?.trim() || "default";
+  const user = getUser();
   payload.user = user;
 
-  // ▼ OBS・別タブ・別ウィンドウへ送信
+  // ▼ ユーザー別チャンネル
+  const bc = new BroadcastChannel("overlay_channel_" + user);
+
+  // ▼ OBS / 別タブ / 別ウィンドウへ送信
   bc.postMessage({
     type: "overlay",
     user,
     payload
   });
 
-  // ▼ iframe へも送信（必要なら）
+  // ▼ iframe へ送信（必要なら）
   const frame = document.getElementById("overlayFrame");
   frame?.contentWindow?.postMessage(
     { type: "overlay", user, payload },
     "*"
   );
 }
+
 
 
 
