@@ -43,6 +43,18 @@ console.log("overlay USER:", USER);
 // ▼ GAS の URL（現状維持）
 //const GAS_URL = "";
 
+const bc = new BroadcastChannel("overlay_channel");
+
+bc.onmessage = (event) => {
+  const data = event.data;
+  if (!data || data.type !== "overlay") return;
+
+  if (data.user !== USER) return;
+
+  renderOverlay(data.payload);
+};
+
+
 /* ---------------------------------------------------------
    ① GAS から overlay データを取得（5秒ごと）
 --------------------------------------------------------- */
@@ -101,6 +113,8 @@ function renderOverlay(data) {
 
   document.getElementById("overlay").innerHTML = html;
 }
+
+  
 </script>
 
 </body>
