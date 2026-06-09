@@ -2390,7 +2390,20 @@ async function generateResultImage() {
   canvas.style.display = "block";
 }
 
+// ▼ ページ読み込み時にユーザー名を自動入力
+window.addEventListener("DOMContentLoaded", () => {
+  const savedUser = localStorage.getItem("overlayUser");
+  if (savedUser) {
+    const input = document.getElementById("overlayUser");
+    if (input) input.value = savedUser;
+  }
+});
 
+
+// ▼ 入力変更時に保存
+document.getElementById("overlayUser")?.addEventListener("input", (e) => {
+  localStorage.setItem("overlayUser", e.target.value.trim());
+});
 
 /* ============================================================
    共有保存（GAS）ダミー
@@ -2413,6 +2426,8 @@ function buildOverlayPayload() {
     scores: calculateTeamScores() || {}
   };
 }
+// ▼ 入力変更時に保存
+
 
   
 function sendHistoryToGAS() {
@@ -2449,40 +2464,35 @@ function openOverlay() {
 
 async function sendOverlay() {
   const payload = buildOverlayPayload();
+  if (!payload) return;
 
-  if (!payload) {
-    console.warn("sendOverlay: payload が生成できませんでした");
-    return;
-  }
+  // ▼ localStorage からユーザー名を取得（input が空でも拾える）
+  const savedUser = localStorage.getItem("overlayUser") || "";
+  const inputUser = document.getElementById("overlayUser")?.value?.trim() || "";
+  const finalUser = inputUser || savedUser || "default";
 
-  console.log("送信前 payload:", payload);
+  // ▼ payload にユーザー名を付与
+  payload.user = finalUser;
 
-  // ▼ ユーザー名（HTML の input などから取得）
-  const user = document.getElementById("overlayUser")?.value?.trim() || "default";
-  payload.user = user; // ★ payload にユーザー名を付与
-
-  // ▼ GAS に送信（今まで通り）
+  // ▼ GAS 送信（現状維持）
   const form = new FormData();
   form.append("payload", JSON.stringify(payload));
-  await fetch(GAS_URL, {
-    method: "POST",
-    body: form,
-    mode: "no-cors"
-  });
+  await fetch(GAS_URL, { method: "POST", body: form, mode: "no-cors" });
 
-  // ▼ overlay.html (iframe) にも postMessage で送信（ユーザー名付き）
+  // ▼ iframe postMessage（ユーザー名付き）
   const frame = document.getElementById("overlayFrame");
   if (frame && frame.contentWindow) {
     frame.contentWindow.postMessage(
       {
         type: "overlay",
-        user,     // ★ ここでもユーザー名を付ける
-        payload   // ★ データ本体
+        user: finalUser,
+        payload
       },
       "*"
     );
   }
 }
+
 
 
 
