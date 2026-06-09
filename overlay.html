@@ -38,7 +38,8 @@ body {
 <script>
 // ▼ GAS の URL
 const GAS_URL = "https://script.google.com/macros/s/AKfycbw6V8r0QeDs6PTzgU_tC0mWe6vOojWAB6_Rfj1Q7KBcf2htcZNSnHFkB9F1ENi-BRuc/exec";
-
+const params = new URLSearchParams(location.search);
+const USER = params.get("user") || "default";
 /* ---------------------------------------------------------
    ① GAS から overlay データを取得（5秒ごと）
 --------------------------------------------------------- */
@@ -63,6 +64,8 @@ fetchOverlayFromGAS();
 --------------------------------------------------------- */
 window.addEventListener("message", (event) => {
   if (!event.data || event.data.type !== "overlay") return;
+
+  if (event.data.user && event.data.user !== USER) return;
 
   // event.data は { type:"overlay", ...payload }
   renderOverlay(event.data);
