@@ -39,7 +39,7 @@ body {
 // ▼ URL パラメータから user を取得（★追加）
 const params = new URLSearchParams(location.search);
 const USER = params.get("user") || "default";
-
+console.log("overlay USER:", USER);
 // ▼ GAS の URL（現状維持）
 //const GAS_URL = "";
 
