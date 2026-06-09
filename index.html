@@ -70,7 +70,7 @@ body.overlay-mode #tabs {
 <div id="overlayTab" class="tabContent" style="display:none; position:relative; height:600px; background: transparent;">
 
   <iframe id="overlayFrame"
-          src="https://sorute03.github.io/MKteamsokuzi/overlay.html"
+          src=""
           style="
             position:absolute;
             top:50%;
@@ -2390,20 +2390,39 @@ async function generateResultImage() {
   canvas.style.display = "block";
 }
 
+function updateOverlayIframe() {
+  const user = document.getElementById("overlayUser")?.value?.trim() || "default";
+  const frame = document.getElementById("overlayFrame");
+  if (frame) {
+    frame.src = "https://sorute03.github.io/MKteamsokuzi/overlay.html?user=" + encodeURIComponent(user);
+  }
+}
+
+
+
 // ▼ ページ読み込み時にユーザー名を自動入力
 window.addEventListener("DOMContentLoaded", () => {
   const savedUser = localStorage.getItem("overlayUser");
-  if (savedUser) {
-    const input = document.getElementById("overlayUser");
-    if (input) input.value = savedUser;
+  const input = document.getElementById("overlayUser");
+
+  if (savedUser && input) {
+    input.value = savedUser;
   }
+
+  updateOverlayIframe(); // ← ★ これが重要
 });
+
+
 
 
 // ▼ 入力変更時に保存
 document.getElementById("overlayUser")?.addEventListener("input", (e) => {
-  localStorage.setItem("overlayUser", e.target.value.trim());
+  const user = e.target.value.trim();
+  localStorage.setItem("overlayUser", user);
+
+  updateOverlayIframe(); // ← ★ これがないと iframe が更新されない
 });
+
 
 /* ============================================================
    共有保存（GAS）ダミー
@@ -2466,33 +2485,26 @@ async function sendOverlay() {
   const payload = buildOverlayPayload();
   if (!payload) return;
 
-  // ▼ localStorage からユーザー名を取得（input が空でも拾える）
   const savedUser = localStorage.getItem("overlayUser") || "";
   const inputUser = document.getElementById("overlayUser")?.value?.trim() || "";
   const finalUser = inputUser || savedUser || "default";
 
-  // ▼ payload にユーザー名を付与
   payload.user = finalUser;
 
-  // ▼ GAS 送信（現状維持）
+  // ▼ GAS 送信は完全停止
+  /*
   const form = new FormData();
   form.append("payload", JSON.stringify(payload));
   await fetch(GAS_URL, { method: "POST", body: form, mode: "no-cors" });
+  */
 
-  // ▼ iframe postMessage（ユーザー名付き）
+  // ▼ overlay.html に postMessage（ユーザー名付き）
   const frame = document.getElementById("overlayFrame");
-  if (frame && frame.contentWindow) {
-    frame.contentWindow.postMessage(
-      {
-        type: "overlay",
-        user: finalUser,
-        payload
-      },
-      "*"
-    );
-  }
+  frame?.contentWindow?.postMessage(
+    { type: "overlay", user: finalUser, payload },
+    "*"
+  );
 }
-
 
 
 
