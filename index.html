@@ -654,6 +654,7 @@ async function loadLocalHistory() {
     const list = req.result || [];
     state._history = list;
     renderLocalHistory(list);
+    updateAnalysisTeamSelect();   // ★ 履歴読み込み後に分析用セレクト更新
   };
 }
 
@@ -686,6 +687,14 @@ function renderLocalHistory(list) {
         <div><strong>${dateStr}</strong>（自チーム：${rec.myTeam}）</div>
         <div>${ranking}</div>
       `;
+
+      // ★ この戦績を analysis に復元して分析する
+      div.addEventListener("click", () => {
+        restoreFromRecordForAnalysis(rec);
+        updateAnalysisTeamSelect();
+        updateTeamAnalysis();
+      });
+
       container.appendChild(div);
     });
 }
@@ -1589,6 +1598,49 @@ async function sendInstantScoreMulti(silent = false) {
    分析関連
 ============================================================ */
 
+function restoreFromRecordForAnalysis(rec) {
+  // 試合データを analysis 用の state に復元
+  state.teams        = rec.teams || [];
+  state.myTeam       = rec.myTeam || "";
+  state.enemyTeams   = rec.enemyTeams || [];
+  state.courseNames  = rec.courses || [];
+  state.teamRanks    = rec.teamRanks || {};
+  state.penalty      = rec.penalty || {};
+  state.backgroundImage = rec.backgroundImage || null;
+}
+
+function updateAnalysisTeamSelect() {
+  const sel = document.getElementById("analysisTeamSelect");
+  if (!sel) return;
+
+  const teams = new Set();
+
+  // 保存された戦績から「自チーム」を集める
+  (state._history || []).forEach(rec => {
+    if (rec.myTeam) teams.add(rec.myTeam);
+  });
+
+  // セレクトを更新
+  sel.innerHTML = [...teams]
+    .map(t => `<option value="${t}">${t}</option>`)
+    .join("");
+
+  // 何か選べる状態なら最初の1件で analysis を走らせてもいい
+  if (sel.value) {
+    updateTeamAnalysis();
+  }
+}
+
+
+function onSelectHistoryForAnalysis(recId) {
+  const rec = state._history.find(r => r.id === recId);
+  if (!rec) return;
+
+  restoreFromRecordForAnalysis(rec);
+  updateTeamAnalysis();
+}
+
+
 function initTeamAnalysisUI() {
   const sel = document.getElementById("analysisTeamSelect");
   if (!sel) return;
@@ -2059,24 +2111,24 @@ function renderCourseOpponentHeatmap(myTeam) {
 function updateTeamAnalysis() {
   const sel = document.getElementById("analysisTeamSelect");
   if (!sel) return;
-  const myTeam = sel.value;
-  if (!myTeam) return;
+  const team = sel.value;
+  if (!team) return;
 
-  const courseStats = calcCourseStats(myTeam);
-  const oppStats = calcOpponentStats(myTeam);
-  const matrix = calcCourseOpponentMatrix(myTeam);
-  const scoreMatrix = calcCourseOpponentScoreDiffMatrix(myTeam);
-  const ranking = calcCourseStrengthRanking(myTeam);
-  const stability = calcStabilityRanking(myTeam);
+  const courseStats = calcCourseStats(team);
+  const oppStats = calcOpponentStats(team);
+  const matrix = calcCourseOpponentMatrix(team);
+  const scoreMatrix = calcCourseOpponentScoreDiffMatrix(team);
+  const ranking = calcCourseStrengthRanking(team);
+  const stability = calcStabilityRanking(team);
 
   renderCourseStats(courseStats);
-  renderOpponentStats(oppStats, myTeam);
-  renderCourseOpponentMatrix(matrix, myTeam);
-  renderCourseOpponentScoreDiffMatrix(scoreMatrix, myTeam);
+  renderOpponentStats(oppStats);
+  renderCourseOpponentMatrix(matrix);
+  renderCourseOpponentScoreDiffMatrix(scoreMatrix);
 
-  renderCourseRadar(myTeam);
-  renderOpponentRadar(myTeam);
-  renderCourseOpponentHeatmap(myTeam);
+  renderCourseRadar(team);
+  renderOpponentRadar(team);
+  renderCourseOpponentHeatmap(team);
 
   renderStrongCourseRanking(ranking.strong);
   renderWeakCourseRanking(ranking.weak);
