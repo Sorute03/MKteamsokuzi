@@ -2458,7 +2458,6 @@ function sendHistoryToGAS() {
 const GAS_URL = "https://script.google.com/macros/s/AKfycbw6V8r0QeDs6PTzgU_tC0mWe6vOojWAB6_Rfj1Q7KBcf2htcZNSnHFkB9F1ENi-BRuc/exec"; // ← あなたの GAS URL
 
 // ▼ 送信用チャンネルを作成
-const bc = new BroadcastChannel("mk_overlay");
 
 // ▼ overlay.html からの要求を受信
 window.addEventListener("message", (event) => {
@@ -2481,27 +2480,26 @@ function openOverlay() {
     `https://sorute03.github.io/MKteamsokuzi/overlay.html?user=${encodeURIComponent(user)}`;
 }
 
-async function sendOverlay() {
+const bc = new BroadcastChannel("overlay_channel");
+
+function sendOverlay() {
   const payload = buildOverlayPayload();
   if (!payload) return;
 
-  const savedUser = localStorage.getItem("overlayUser") || "";
-  const inputUser = document.getElementById("overlayUser")?.value?.trim() || "";
-  const finalUser = inputUser || savedUser || "default";
+  const user = document.getElementById("overlayUser")?.value?.trim() || "default";
+  payload.user = user;
 
-  payload.user = finalUser;
+  // ▼ OBS・別タブ・別ウィンドウへ送信
+  bc.postMessage({
+    type: "overlay",
+    user,
+    payload
+  });
 
-  // ▼ GAS 送信は完全停止
-  /*
-  const form = new FormData();
-  form.append("payload", JSON.stringify(payload));
-  await fetch(GAS_URL, { method: "POST", body: form, mode: "no-cors" });
-  */
-
-  // ▼ overlay.html に postMessage（ユーザー名付き）
+  // ▼ iframe へも送信（必要なら）
   const frame = document.getElementById("overlayFrame");
   frame?.contentWindow?.postMessage(
-    { type: "overlay", user: finalUser, payload },
+    { type: "overlay", user, payload },
     "*"
   );
 }
