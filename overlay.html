@@ -36,23 +36,29 @@ body {
 <div id="overlay">待機中...</div>
 
 <script>
-// ▼ URL パラメータから user を取得（★追加）
 const params = new URLSearchParams(location.search);
 const USER = params.get("user") || "default";
 console.log("overlay USER:", USER);
-// ▼ GAS の URL（現状維持）
-//const GAS_URL = "";
 
-const bc = new BroadcastChannel("overlay_channel");
+// ▼ ユーザー別チャンネルを購読
+const bc = new BroadcastChannel("overlay_channel_" + USER);
 
 bc.onmessage = (event) => {
   const data = event.data;
   if (!data || data.type !== "overlay") return;
 
+  // user チェックは不要（チャンネルが分かれているため）
+  renderOverlay(data.payload);
+};
+
+// ▼ iframe / window.open 用 postMessage も残す
+window.addEventListener("message", (event) => {
+  const data = event.data;
+  if (!data || data.type !== "overlay") return;
   if (data.user !== USER) return;
 
   renderOverlay(data.payload);
-};
+});
 
 
 /* ---------------------------------------------------------
