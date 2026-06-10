@@ -713,6 +713,21 @@ function calcScoresFromRecord(rec) {
   return result;
 }
 
+function showTab(tabId) {
+  // 全タブ非表示
+  document.querySelectorAll(".tabContent").forEach(t => t.style.display = "none");
+
+  // 表示
+  document.getElementById(tabId).style.display = "block";
+
+  // overlay タブ以外では iframe を無効化
+  const iframe = document.getElementById("overlayFrame");
+  if (tabId !== "overlayTab") {
+    iframe.style.display = "none";   // ← 完全に消す
+  } else {
+    iframe.style.display = "block";
+  }
+}
 
 
 
