@@ -15,7 +15,7 @@ body { margin:0; padding:10px; font-family:sans-serif; }
   width: 100%;
   background: rgba(0,0,0,0.6);
   padding: 6px;
-  z-index: 9999;
+  z-index: 10;
 }
 
 body.overlay-mode #tabs {
@@ -1614,23 +1614,10 @@ function updateAnalysisTeamSelect() {
   if (!sel) return;
 
   const teams = new Set();
+  (state._history || []).forEach(rec => teams.add(rec.myTeam));
 
-  // 保存された戦績から「自チーム」を集める
-  (state._history || []).forEach(rec => {
-    if (rec.myTeam) teams.add(rec.myTeam);
-  });
-
-  // セレクトを更新
-  sel.innerHTML = [...teams]
-    .map(t => `<option value="${t}">${t}</option>`)
-    .join("");
-
-  // 何か選べる状態なら最初の1件で analysis を走らせてもいい
-  if (sel.value) {
-    updateTeamAnalysis();
-  }
+  sel.innerHTML = [...teams].map(t => `<option value="${t}">${t}</option>`).join("");
 }
-
 
 function onSelectHistoryForAnalysis(recId) {
   const rec = state._history.find(r => r.id === recId);
@@ -1664,13 +1651,10 @@ function getTeamsFoughtWith(myTeam) {
   for (const raceId in state.teamRanks) {
     const teams = Object.keys(state.teamRanks[raceId]);
     if (!teams.includes(myTeam)) continue;
-
-    teams.forEach(t => {
-      if (t !== myTeam) set.add(t);
-    });
+    teams.forEach(t => { if (t !== myTeam) set.add(t); });
   }
 
-  return Array.from(set);
+  return [...set];
 }
 
 
