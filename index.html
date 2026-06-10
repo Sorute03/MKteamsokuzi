@@ -1209,21 +1209,31 @@ function toggleRank(team, round, rank, btn) {
   const arr = state.teamRanks[team][round];
   const idx = arr.indexOf(rank);
 
+  // ① 選択済み → 必ず解除できる
   if (idx >= 0) {
-    arr.splice(idx,1);
+    arr.splice(idx, 1);
     btn.classList.remove("selected");
-  } else {
-    if (arr.length < state.teamSizeMap[team]) {
-      arr.push(rank);
-      btn.classList.add("selected");
-    } else {
-      alert(`${team} は最大 ${state.teamSizeMap[team]} 人です`);
-    }
+    updateScores();
+    return;
   }
 
+  // ② 未選択 → 人数制限チェックして追加
+  const need = state.teamSizeMap[team];
+  if (arr.length < need) {
+    arr.push(rank);
+    btn.classList.add("selected");
+  } else {
+    alert(`${team} は最大 ${need} 人です`);
+    return;
+  }
+
+  // ③ 自動補完はそのまま動く
   autoFillMissingTeam(round);
+
   updateScores();
 }
+
+
 
 function autoFillMissingTeam(round) {
   const filled = state.teams.filter(t =>
