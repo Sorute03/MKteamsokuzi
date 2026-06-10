@@ -281,6 +281,20 @@ body.overlay-mode #tabs {
   <h3>背景画像</h3>
   <input type="file" id="bgImageInput" accept="image/*" onchange="loadBackgroundImage(this.files[0])">
   <div style="font-size:12px;color:#666;">未設定の場合はデフォルト背景を使用</div>
+  
+  <h3>文字色設定</h3>
+  <input type="color" id="resultTextColorInput" value="#ffffff" onchange="setResultTextColor(this.value)">
+  <div style="font-size:12px; color:#666;">リザルト画像内の文字色を変更できます</div>
+
+  <h3>影（text-shadow）</h3>
+  <label><input type="checkbox" id="resultTextShadowInput" onchange="setResultTextShadow(this.checked)"> 影を付ける</label>
+
+  <h3>縁取り（strokeText）</h3>
+  <label><input type="checkbox" id="resultStrokeInput" onchange="setResultStroke(this.checked)"> 縁取りを付ける</label>
+
+  <h3>背景の明るさ</h3>
+  <input type="range" id="resultBgBrightnessInput" min="0.5" max="1.5" step="0.01" value="1" onchange="setResultBgBrightness(this.value)">
+  <div style="font-size:12px;color:#666;">1.0 = 元の明るさ</div>
 
 
   <h3>リザルト画像</h3>
@@ -848,6 +862,7 @@ function getLatestTeams() {
 function getEnemyTeamsOnly() {
   return getLatestTeams().enemyTeams;
 }
+
 
 
 /* ============================================================
@@ -2438,65 +2453,122 @@ function onP2PMessage(ev) {
    リザルト画像生成
 ============================================================ */
 
+state.resultTextColor = "#ffffff";
+state.resultTextShadow = false;
+state.resultStroke = false;
+state.resultBgBrightness = 1;
+
+function setResultTextColor(v) { state.resultTextColor = v; }
+function setResultTextShadow(v) { state.resultTextShadow = v; }
+function setResultStroke(v) { state.resultStroke = v; }
+function setResultBgBrightness(v) { state.resultBgBrightness = parseFloat(v); }
+ 
+
 async function generateResultImage() {
   const canvas = document.getElementById("resultCanvas");
   const ctx = canvas.getContext("2d");
   const w = canvas.width;
   const h = canvas.height;
 
-  // 背景画像がある場合
+  /* ============================
+     背景描画（明暗調整対応）
+  ============================ */
   if (state.backgroundImage) {
     const img = new Image();
     img.src = state.backgroundImage;
     await img.decode();
     ctx.drawImage(img, 0, 0, w, h);
   } else {
-    // デフォルト背景
-    ctx.fillStyle = "#8b0000"; // 濃い赤
+    ctx.fillStyle = "#8b0000";
     ctx.fillRect(0, 0, w, h);
   }
 
-  // ここから先は既存の描画処理
-  ctx.fillStyle = "#fff";
-  ctx.font = "28px sans-serif";
-  ctx.fillText("MK Result", 20, 40);
+  // 明暗調整（brightness）
+  if (state.resultBgBrightness !== 1) {
+    // 1 → 透明、0.5 → 黒50%、1.5 → 白50%
+    if (state.resultBgBrightness < 1) {
+      const alpha = 1 - state.resultBgBrightness;
+      ctx.fillStyle = `rgba(0,0,0,${alpha})`;
+      ctx.fillRect(0, 0, w, h);
+    } else {
+      const alpha = state.resultBgBrightness - 1;
+      ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+      ctx.fillRect(0, 0, w, h);
+    }
+  }
+
+  /* ============================
+     テキスト描画用関数（影・縁取り対応）
+  ============================ */
+  function drawText(text, x, y, fontSize = 28, align = "left", color = state.resultTextColor) {
+    ctx.font = `${fontSize}px sans-serif`;
+    ctx.textAlign = align;
+    ctx.textBaseline = "top";
+
+    // 影
+    if (state.resultTextShadow) {
+      ctx.shadowColor = "rgba(0,0,0,0.8)";
+      ctx.shadowBlur = 6;
+      ctx.shadowOffsetX = 3;
+      ctx.shadowOffsetY = 3;
+    } else {
+      ctx.shadowColor = "transparent";
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
+    }
+
+    // 縁取り
+    if (state.resultStroke) {
+      ctx.lineWidth = 6;
+      ctx.strokeStyle = "black";
+      ctx.strokeText(text, x, y);
+    }
+
+    // 本体
+    ctx.fillStyle = color;
+    ctx.fillText(text, x, y);
+  }
+
+  /* ============================
+     ここから既存の描画処理
+  ============================ */
+
+  drawText("MK Result", 20, 40, 32);
 
   const d = new Date(state.timestamp || Date.now());
-  ctx.font = "16px sans-serif";
-  ctx.fillText(d.toLocaleString(), 20, 70);
-  ctx.fillText(`自チーム：${state.myTeam}`, 20, 95);
+  drawText(d.toLocaleString(), 20, 80, 18);
+  drawText(`自チーム：${state.myTeam}`, 20, 105, 18);
 
   const scores = calculateTeamScores();
   const ranking = Object.entries(scores).sort((a,b)=>b[1]-a[1]);
 
-  ctx.font = "20px sans-serif";
-  ctx.fillText("総合スコア", 20, 130);
+  drawText("総合スコア", 20, 140, 24);
 
-  let y = 160;
+  let y = 175;
   ranking.forEach(([team,score],i)=>{
     const diff = score - ranking[0][1];
-    ctx.fillStyle = (team === state.myTeam) ? "#4caf50" : "#fff";
-    ctx.fillText(`${i+1}位 ${team} ${score}点 ${diff===0?"":`(${diff})`}`, 40, y);
-    y += 28;
+    const color = (team === state.myTeam) ? "#4caf50" : state.resultTextColor;
+    drawText(`${i+1}位 ${team} ${score}点 ${diff===0?"":`(${diff})`}`, 40, y, 20, "left", color);
+    y += 30;
   });
 
   const roundScores = calcRoundScores();
-  ctx.fillStyle = "#fff";
-  ctx.font = "18px sans-serif";
-  ctx.fillText("ラウンド別スコア", 20, y + 20);
+  drawText("ラウンド別スコア", 20, y + 20, 22);
 
-  let yy = y + 50;
+  let yy = y + 55;
   for (let r=0; r<totalRounds; r++) {
     const course = state.courseNames[r] || `R${r+1}`;
-    ctx.font = "14px sans-serif";
-    ctx.fillText(`${r+1}R ${course}`, 20, yy);
+    drawText(`${r+1}R ${course}`, 20, yy, 16);
+
     let xx = 200;
     ranking.forEach(([team])=>{
       const s = roundScores[r][team];
-      ctx.fillText(`${team}:${s}`, xx, yy);
+      drawText(`${team}:${s}`, xx, yy, 16);
       xx += 150;
     });
-    yy += 22;
+
+    yy += 26;
     if (yy > h - 40) break;
   }
 
