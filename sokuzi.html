@@ -1,678 +1,158 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<title>MK Rank Input & History</title>
-<style>
-body { margin:0; padding:10px; font-family:sans-serif; }
-#tabs { display:flex; gap:4px; margin-bottom:10px; }
-.tabBtn { padding:6px 12px; border:1px solid #ccc; background:#f5f5f5; cursor:pointer; }
-.tabBtn.active { background:#4caf50; color:#fff; }
-.tabContent { margin-top:10px; }
-.team-section { margin-bottom:20px; }
-.rank-buttons { display:flex; flex-wrap:wrap; gap:4px; }
-.rank-button {
-  width:32px; height:32px; text-align:center; line-height:32px;
-  border:1px solid #ccc; cursor:pointer; border-radius:4px; font-size:12px;
-}
-.rank-button.selected { background:#4caf50; color:white; }
-#penaltyModal {
-  display:none; position:fixed; top:50%; left:50%;
-  transform:translate(-50%,-50%); background:white;
-  padding:20px; border:2px solid #333; border-radius:10px; z-index:9999;
-}
-.record { border:1px solid #ccc; padding:6px; margin:4px 0; font-size:12px; }
-</style>
+  <meta charset="UTF-8">
+  <title>MK8DX 即時集計＋補正＋ペナルティ</title>
+  <script src="https://unpkg.com/tesseract.js@v4.0.2/dist/tesseract.min.js"></script>
+  <style>
+    .player-row {
+      display: flex;
+      gap: 4px;
+      margin-bottom: 4px;
+    }
+    .player-row input {
+      width: 120px;
+    }
+    .player-row input.name {
+      width: 200px;
+    }
+  </style>
 </head>
 <body>
 
-<!-- タブ -->
-<div id="tabs">
-  <button class="tabBtn active" data-tab="inputTab">入力</button>
-  <button class="tabBtn" data-tab="historyTab">戦績</button>
-</div>
-
-<!-- 入力タブ -->
-<div id="inputTab" class="tabContent" style="display:block;">
-
-  <h3>チームID登録</h3>
+  <!-- カメラ選択 -->
   <div>
-    <label>チームID：</label>
-    <input id="teamIdInput" placeholder="例：ABC123">
-    <button onclick="applyTeamId()">登録</button>
-    <button onclick="generateTeamId()">新規作成</button>
+    <select id="cameraSelect"></select>
+    <button id="startCam">カメラ開始</button>
   </div>
-  <div id="teamIdStatus" style="margin-top:5px; color:green;"></div>
 
-  <hr>
-
-  <h3>モード設定</h3>
+  <!-- プレイヤー人数（12 or 24） -->
   <div>
-    <label>モード：</label>
-    <select id="modeSelect">
+    <label>プレイヤー人数:</label>
+    <select id="playerCount">
+      <option value="12">12人</option>
+      <option value="24">24人</option>
+    </select>
+  </div>
+
+  <!-- 集計形式（2v2〜12v12） -->
+  <div>
+    <label>集計形式:</label>
+    <select id="format">
+      <option value="2v2">2v2</option>
       <option value="3v3">3v3</option>
       <option value="4v4">4v4</option>
-      <option value="6v6" selected>6v6</option>
+      <option value="6v6">6v6</option>
       <option value="8v8">8v8</option>
       <option value="12v12">12v12</option>
     </select>
   </div>
 
-  <h3>チーム設定</h3>
+  <!-- チームタグ -->
   <div>
-    <label>チーム数：</label>
-    <select id="teamCountSelect">
-      <option value="2">2チーム</option>
-      <option value="3">3チーム</option>
-      <option value="4" selected>4チーム</option>
-      <option value="5">5チーム</option>
-      <option value="6">6チーム</option>
-    </select>
+    <label>チームタグ（カンマ区切り）:</label><br>
+    <textarea id="teamTags" rows="2" cols="40">ZX★,Mf,αTau,Ans☆</textarea>
   </div>
-  <br>
+
+  <!-- OCR実行 -->
   <div>
-    <label>自チーム：</label>
-    <input id="myTeamInput" value="チーム1">
-  </div>
-  <br>
-  <div id="enemyTeamEditor"></div>
-  <button onclick="applyTeamNames(); saveMyTeamName();">チーム名を適用</button>
-
-  <hr>
-
-  <h3>コース選択</h3>
-  <div id="course-container"></div>
-
-  <div class="button-bar" style="margin-top:10px;">
-    <button onclick="resetRanks()">リセット</button>
-    <button onclick="openPenaltyTeamSelect()">ペナルティ</button>
-    <button onclick="saveHistoryRecord()">この試合をローカル保存</button>
-    <button onclick="sendHistoryToGAS()">この試合を共有保存</button>
+    <button id="runOcr">OCR実行</button>
   </div>
 
-  <div id="teams-container" style="margin-top:10px;"></div>
+  <!-- プレイヤー編集UI（名前＋点数＋補正＋ペナルティ） -->
+  <div id="playerInputs"></div>
 
-  <h3>スコア</h3>
-  <table id="scoreTable" border="1">
-    <thead><tr><th>順位</th><th>チーム</th><th>スコア</th></tr></thead>
-    <tbody></tbody>
-  </table>
-
-  <!-- ペナルティ用モーダル -->
-  <div id="penaltyModal">
-    <h3>ペナルティ対象チームを選択</h3>
-    <div id="penaltyTeamButtons"></div>
-    <button onclick="closePenaltyModal()">閉じる</button>
+  <!-- 再集計 -->
+  <div>
+    <button id="forceRecalc">再集計</button>
   </div>
 
-</div>
+  <!-- 結果確認 -->
+  <pre id="result"></pre>
 
-<!-- 戦績タブ -->
-<div id="historyTab" class="tabContent" style="display:none;">
-  <h3>共有戦績（teamId）</h3>
-  <div id="sharedHistory">teamId を設定してから開いてください。</div>
+  <!-- カメラ映像 -->
+  <video id="cam" autoplay playsinline></video>
 
-  <h3>個人戦績（IndexedDB）</h3>
-  <div id="localHistory"></div>
-</div>
+  <script>
+    // ===== カメラ周り =====
+    const cameraSelect   = document.getElementById("cameraSelect");
+    const startCamBtn    = document.getElementById("startCam");
+    const video          = document.getElementById("cam");
+    const playerCountSel = document.getElementById("playerCount");
+    const runOcrBtn      = document.getElementById("runOcr");
+    const playerInputs   = document.getElementById("playerInputs");
+    const forceRecalcBtn = document.getElementById("forceRecalc");
+    const teamTagsInput  = document.getElementById("teamTags");
+    const formatSel      = document.getElementById("format");
+    const resultPre      = document.getElementById("result");
 
-<script>
-/* 設定 */
-const GAS_URL = "https://script.google.com/macros/s/AKfycbx7NyDZJJgQWUlut714WFBKSLDC7SHVyvHQAnFDwoZn3nTwZLjzsRlGc3JAWvLBxTwl/exec";
-const totalRounds = 12;
+    async function loadCameras() {
+      const devices = await navigator.mediaDevices.enumerateDevices();
+      const cams = devices.filter(d => d.kind === "videoinput");
 
-  
-/* 状態 */
-const state = {
-  teamId: "",
-  mode: "6v6",
-  teams: ["チーム1","チーム2","チーム3","チーム4"],
-  myTeam: "チーム1",
-  enemyTeams: ["チーム2","チーム3","チーム4"],
+      cameraSelect.innerHTML = "";
+      cams.forEach(cam => {
+        const opt = document.createElement("option");
+        opt.value = cam.deviceId;
+        opt.textContent = cam.label || `Camera ${cameraSelect.length + 1}`;
+        cameraSelect.appendChild(opt);
+      });
+    }
 
-  /* ▼ コースリストはここに入れる（省略版） ▼ */
-  courseList: [
-    /* ← ここにあなたの巨大 courseList 全部を入れる */
-  ],
+    async function startCamera(deviceId) {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { deviceId: { exact: deviceId } }
+      });
+      video.srcObject = stream;
+    }
 
-  teamSizeMap: {},
-  teamRanks: {},
-  courseNames: Array(totalRounds).fill(""),
-  penalty: {},
-  currentRound: 0
-};
-
-/* IndexedDB（history） */
-function openDB() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open("mk_history", 1);
-    req.onupgradeneeded = e => {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains("history")) {
-        db.createObjectStore("history", { keyPath:"id" });
-      }
+    startCamBtn.onclick = () => {
+      const id = cameraSelect.value;
+      if (id) startCamera(id);
     };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
 
-/* ▼ ここから下はすべて完全版（省略なし） ▼ */
-function generateTeamId() {
-  const id = Math.random().toString(36).substring(2, 8).toUpperCase();
-  document.getElementById("teamIdInput").value = id;
-  applyTeamId();
-}
+    loadCameras();
 
+    // ===== OCR共通関数 =====
+    async function ocrRegion(video, region) {
+      const c = document.createElement("canvas");
+      c.width = region.width;
+      c.height = region.height;
+      const ctx = c.getContext("2d");
 
-/* teamId 登録 → 自チーム名を取得 */
-async function applyTeamId() {
-  const id = document.getElementById("teamIdInput").value.trim();
-  if (!id) {
-    alert("チームIDを入力してください");
-    return;
-  }
-
-  state.teamId = id;
-  document.getElementById("teamIdStatus").textContent =
-    `チームID「${id}」を使用中`;
-
-  // ▼ 自チーム名を取得
-  const res = await fetch(GAS_URL + `?type=teamName&teamId=${id}`);
-  const data = await res.json();
-
-  if (data.myTeamName) {
-    state.myTeam = data.myTeamName;
-    document.getElementById("myTeamInput").value = data.myTeamName;
-  }
-
-  alert("チームIDを登録しました");
-}
-
-/* 自チーム名を GAS に保存 */
-async function saveMyTeamName() {
-  if (!state.teamId) {
-    alert("先にチームIDを登録してください");
-    return;
-  }
-
-  const name = document.getElementById("myTeamInput").value.trim();
-  if (!name) return;
-
-  state.myTeam = name;
-
-  await fetch(GAS_URL + "?type=teamName", {
-    method: "POST",
-    mode: "cors",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      teamId: state.teamId,
-      myTeamName: name
-    })
-  });
-
-  alert("自チーム名をチームIDにリンクしました");
-}
-
-/* 以下、順位入力・スコア計算・同期などすべて完全版（省略なし） */
-
-function setFormatFromMode(modeStr) {
-  state.mode = modeStr;
-
-  const size = parseInt(modeStr.split("v")[0]);
-  const totalPlayers = 24;
-  const teamCount = totalPlayers / size;
-
-  document.getElementById("teamCountSelect").value = String(teamCount);
-
-  const names = [];
-  names.push(state.myTeam || "チーム1");
-  for (let i = 1; i < teamCount; i++) {
-    names.push(state.enemyTeams[i-1] || `チーム${i+1}`);
-  }
-  state.teams = names;
-  state.enemyTeams = names.slice(1);
-
-  state.teamSizeMap = {};
-  state.teams.forEach(team => state.teamSizeMap[team] = size);
-
-  state.teamRanks = {};
-  state.teams.forEach(team => {
-    state.teamRanks[team] = {};
-    for (let r=0; r<totalRounds; r++) state.teamRanks[team][r] = [];
-  });
-
-  createTeamNameEditor();
-  createCourseSelectors();
-  createTeamInputs();
-  updateScores();
-}
-
-function createEnemyTeamEditor() {
-  const count = parseInt(document.getElementById("teamCountSelect").value);
-  const container = document.getElementById("enemyTeamEditor");
-  container.innerHTML = "";
-
-  for (let i = 1; i < count; i++) {
-    const name = state.enemyTeams[i-1] || `チーム${i+1}`;
-    const row = document.createElement("div");
-    row.innerHTML = `
-      <label>敵チーム${i}：</label>
-      <input id="enemyTeamInput-${i}" value="${name}">
-    `;
-    container.appendChild(row);
-  }
-}
-
-function createTeamNameEditor() {
-  document.getElementById("myTeamInput").value = state.myTeam;
-  createEnemyTeamEditor();
-}
-
-function applyTeamNames() {
-  const count = parseInt(document.getElementById("teamCountSelect").value);
-
-  const myTeam = document.getElementById("myTeamInput").value.trim() || "自チーム";
-  const enemyTeams = [];
-  for (let i = 1; i < count; i++) {
-    const v = document.getElementById(`enemyTeamInput-${i}`).value.trim();
-    enemyTeams.push(v || `敵チーム${i}`);
-  }
-
-  state.myTeam = myTeam;
-  state.enemyTeams = enemyTeams;
-  state.teams = [myTeam, ...enemyTeams];
-  state.penalty = {};
-
-  setFormatFromMode(state.mode);
-  alert("チーム名を更新しました");
-}
-
-function createCourseSelectors() {
-  const container = document.getElementById("course-container");
-  container.innerHTML = "";
-
-  for (let i=0; i<totalRounds; i++) {
-    const row = document.createElement("div");
-    row.innerHTML = `
-      <label>ラウンド${i+1}：</label>
-      <select id="course-select-${i}">
-        ${state.courseList.map(c => `<option>${c}</option>`).join("")}
-      </select>
-    `;
-    container.appendChild(row);
-  }
-}
-
-function createTeamInputs() {
-  const container = document.getElementById("teams-container");
-  container.innerHTML = "";
-
-  for (let round=0; round<totalRounds; round++) {
-    const section = document.createElement("div");
-    section.className = "team-section";
-
-    const header = document.createElement("div");
-    header.style.display = "flex";
-    header.style.justifyContent = "space-between";
-    header.innerHTML = `
-      <h3>ラウンド${round+1}</h3>
-      <button onclick="confirmRound(${round})">確定</button>
-    `;
-    section.appendChild(header);
-
-    state.teams.forEach(team => {
-      const label = document.createElement("div");
-      label.textContent = team;
-
-      const row = document.createElement("div");
-      row.className = "rank-buttons";
-
-      for (let rank=1; rank<=24; rank++) {
-        const btn = document.createElement("div");
-        btn.className = "rank-button";
-        btn.textContent = rank;
-        btn.dataset.team = team;
-        btn.dataset.round = round;
-        btn.dataset.rank = rank;
-        btn.onclick = () => toggleRank(team, round, rank, btn);
-        row.appendChild(btn);
-      }
-
-      section.appendChild(label);
-      section.appendChild(row);
-    });
-
-    container.appendChild(section);
-  }
-}
-
-function toggleRank(team, round, rank, btn) {
-  const arr = state.teamRanks[team][round];
-  const idx = arr.indexOf(rank);
-
-  if (idx >= 0) {
-    arr.splice(idx,1);
-    btn.classList.remove("selected");
-  } else {
-    if (arr.length < state.teamSizeMap[team]) {
-      arr.push(rank);
-      btn.classList.add("selected");
-    } else {
-      alert(`${team} は最大 ${state.teamSizeMap[team]} 人です`);
-    }
-  }
-
-  autoFillMissingTeam(round);
-  updateScores();
-}
-
-function autoFillMissingTeam(round) {
-  const filled = state.teams.filter(t =>
-    state.teamRanks[t][round].length === state.teamSizeMap[t]
-  );
-  if (filled.length < state.teams.length - 1) return;
-
-  const used = new Set();
-  state.teams.forEach(t => {
-    state.teamRanks[t][round].forEach(r => used.add(r));
-  });
-
-  const remaining = Array.from({length:24},(_,i)=>i+1).filter(r=>!used.has(r));
-
-  state.teams.forEach(team => {
-    const need = state.teamSizeMap[team];
-    const arr = state.teamRanks[team][round];
-    while (arr.length < need && remaining.length > 0) {
-      const next = remaining.shift();
-      arr.push(next);
-      const btn = document.querySelector(
-        `.rank-button[data-team="${team}"][data-round="${round}"][data-rank="${next}"]`
+      ctx.drawImage(
+        video,
+        region.x, region.y, region.width, region.height,
+        0, 0, region.width, region.height
       );
-      if (btn) btn.classList.add("selected");
-    }
-  });
-}
 
-function getPointsByRank(rank) {
-  if (rank===1) return 15;
-  if (rank===2) return 12;
-  if (rank===3) return 10;
-  if (rank===4||rank===5) return 9;
-  if (rank===6||rank===7) return 8;
-  if (rank===8||rank===9) return 7;
-  if (rank>=10 && rank<=12) return 6;
-  if (rank>=13 && rank<=15) return 5;
-  if (rank>=16 && rank<=18) return 4;
-  if (rank>=19 && rank<=21) return 3;
-  if (rank===22||rank===23) return 2;
-  if (rank===24) return 1;
-  return 0;
-}
-
-function calculateTeamScores() {
-  const result = {};
-  state.teams.forEach(team => {
-    let score = 0;
-    for (let r=0; r<totalRounds; r++) {
-      state.teamRanks[team][r].forEach(rank => {
-        score += getPointsByRank(rank);
-      });
-    }
-    score += (state.penalty[team] || 0);
-    result[team] = score;
-  });
-  return result;
-}
-
-function updateScores() {
-  const scores = calculateTeamScores();
-  const results = Object.entries(scores).sort((a,b)=>b[1]-a[1]);
-
-  const tbody = document.querySelector("#scoreTable tbody");
-  tbody.innerHTML = "";
-  results.forEach(([team,score],i)=>{
-    const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${i+1}</td><td>${team}</td><td>${score}</td>`;
-    tbody.appendChild(tr);
-  });
-
-  sendCurrentToGAS();
-}
-
-function confirmRound(round) {
-  const course = document.getElementById(`course-select-${round}`).value;
-  state.courseNames[round] = course;
-
-  for (const team of state.teams) {
-    const need = state.teamSizeMap[team];
-    const arr = state.teamRanks[team][round];
-    if (arr.length !== need) {
-      alert(`${team} の人数が不足しています`);
-      return;
-    }
-  }
-  alert(`ラウンド${round+1}を保存しました`);
-}
-
-function openPenaltyTeamSelect() {
-  const container = document.getElementById("penaltyTeamButtons");
-  container.innerHTML = "";
-  state.teams.forEach(team=>{
-    const btn = document.createElement("button");
-    btn.textContent = team;
-    btn.onclick = ()=>selectPenaltyTeam(team);
-    container.appendChild(btn);
-  });
-  document.getElementById("penaltyModal").style.display = "block";
-}
-function closePenaltyModal() {
-  document.getElementById("penaltyModal").style.display = "none";
-}
-function selectPenaltyTeam(team) {
-  closePenaltyModal();
-  const p = parseInt(prompt(`${team} のペナルティ点数`),10);
-  if (!p) return;
-  state.penalty[team] = (state.penalty[team] || 0) + p;
-  updateScores();
-}
-
-function resetRanks() {
-  if (!confirm("リセットしますか？")) return;
-  setFormatFromMode(state.mode);
-}
-
-function sendCurrentToGAS() {
-  if (!state.teamId) return;
-  const payload = {
-    teamId: state.teamId,
-    teamScores: calculateTeamScores(),
-    teams: state.teams,
-    timestamp: Date.now()
-  };
-  fetch(GAS_URL + "?type=current", {
-    method:"POST",
-    mode:"cors",
-    headers:{ "Content-Type":"application/json" },
-    body:JSON.stringify(payload)
-  }).catch(()=>{});
-}
-
-function sendHistoryToGAS() {
-  if (!state.teamId) {
-    alert("先にチームIDを登録してください");
-    return;
-  }
-  const payload = {
-    teamId: state.teamId,
-    mode: state.mode,
-    teams: state.teams,
-    teamRanks: state.teamRanks,
-    teamScores: calculateTeamScores(),
-    courseNames: state.courseNames,
-    penalty: state.penalty,
-    timestamp: Date.now()
-  };
-  fetch(GAS_URL + "?type=history", {
-    method:"POST",
-    mode:"cors",
-    headers:{ "Content-Type":"application/json" },
-    body:JSON.stringify(payload)
-  }).then(()=>alert("この試合を共有戦績に保存しました"))
-    .catch(()=>alert("共有保存に失敗しました"));
-}
-
-/* ローカル保存 */
-async function saveHistoryRecord() {
-  const db = await openDB();
-  const tx = db.transaction("history","readwrite");
-  const store = tx.objectStore("history");
-
-  const record = {
-    id: Date.now(),
-    timestamp: Date.now(),
-    mode: state.mode,
-    teams: state.teams,
-    teamRanks: state.teamRanks,
-    teamScores: calculateTeamScores(),
-    courseNames: state.courseNames,
-    penalty: state.penalty,
-    synced: false
-  };
-
-  store.put(record);
-  await tx.complete;
-  alert("この試合をローカル（IndexedDB）に保存しました");
-}
-
-/* 6時間ごとの差分同期（IndexedDB → GAS） */
-async function syncHistoryToGAS() {
-  if (!state.teamId) return;
-
-  try {
-    const db = await openDB();
-    const tx = db.transaction("history", "readwrite");
-    const store = tx.objectStore("history");
-
-    const all = await store.getAll();
-    const unsynced = all.filter(r => !r.synced);
-
-    for (const record of unsynced) {
-      await fetch(GAS_URL + "?type=history", {
-        method: "POST",
-        mode: "cors",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          teamId: state.teamId,
-          ...record
-        })
-      });
-      record.synced = true;
-      store.put(record);
+      const { data: { text } } = await Tesseract.recognize(c, "jpn");
+      return text;
     }
 
-    await tx.complete;
-    console.log("同期完了（未同期データを送信しました）");
-  } catch (e) {
-    console.log("同期失敗", e);
-  }
-}
+    // ===== 名前・点数の領域計算（12人 / 24人対応） =====
+    function calcNameRegion(i, videoWidth, videoHeight) {
+      const count = parseInt(playerCountSel.value);
+      const rowHeight = videoHeight / count;
 
-/* 共有戦績読み込み */
-async function loadSharedHistory() {
-  if (!state.teamId) {
-    document.getElementById("sharedHistory").textContent =
-      "teamId を入力して登録してから開いてください。";
-    return;
-  }
-  try {
-    const res = await fetch(GAS_URL + "?type=history&teamId=" + state.teamId);
-    const data = await res.json();
-    const container = document.getElementById("sharedHistory");
-    if (!data.length) {
-      container.textContent = "共有戦績はまだありません。";
-      return;
+      return {
+        x: videoWidth * 0.18,
+        y: rowHeight * i,
+        width: videoWidth * 0.32,
+        height: rowHeight
+      };
     }
-    container.innerHTML = data.map(r => `
-      <div class="record">
-        <b>${new Date(r.timestamp).toLocaleString()}</b><br>
-        モード: ${r.mode}<br>
-        スコア: ${Object.entries(r.teamScores).map(([t,s])=>`${t}:${s}`).join(" / ")}
-      </div>
-    `).join("");
-  } catch {
-    document.getElementById("sharedHistory").textContent =
-      "共有戦績の取得に失敗しました。";
-  }
-}
 
-/* ローカル戦績読み込み */
-async function loadLocalHistory() {
-  try {
-    const db = await openDB();
-    const tx = db.transaction("history","readonly");
-    const store = tx.objectStore("history");
-    const all = await store.getAll();
-    const container = document.getElementById("localHistory");
-    if (!all.length) {
-      container.textContent = "ローカル戦績はまだありません。";
-      return;
+    function calcScoreRegion(i, videoWidth, videoHeight) {
+      const count = parseInt(playerCountSel.value);
+      const rowHeight = videoHeight / count;
+
+      return {
+        x: videoWidth * 0.63,
+        y: rowHeight * i,
+        width: videoWidth * 0.10,
+        height: rowHeight
+      };
     }
-    container.innerHTML = all.map(r => `
-      <div class="record">
-        <b>${new Date(r.timestamp).toLocaleString()}</b><br>
-        モード: ${r.mode}<br>
-        スコア: ${Object.entries(r.teamScores).map(([t,s])=>`${t}:${s}`).join(" / ")}
-      </div>
-    `).join("");
-  } catch {
-    document.getElementById("localHistory").textContent =
-      "ローカル戦績の取得に失敗しました。";
-  }
-}
 
-/* タブ切り替え */
-document.querySelectorAll(".tabBtn").forEach(btn => {
-  btn.onclick = () => {
-    const target = btn.dataset.tab;
-    document.querySelectorAll(".tabContent").forEach(tab => {
-      tab.style.display = "none";
-    });
-    document.querySelectorAll(".tabBtn").forEach(b => {
-      b.classList.remove("active");
-    });
-    document.getElementById(target).style.display = "block";
-    btn.classList.add("active");
-
-    if (target === "historyTab") {
-      loadSharedHistory();
-      loadLocalHistory();
-    }
-  };
-});
-
-/* 6時間ごとに共有戦績を自動更新（historyタブが表示中のみ） */
-setInterval(() => {
-  if (document.getElementById("historyTab").style.display === "block") {
-    loadSharedHistory();
-  }
-}, 6 * 60 * 60 * 1000);
-
-/* 6時間ごとにローカル→GAS 同期 */
-setInterval(syncHistoryToGAS, 6 * 60 * 60 * 1000);
-
-/* イベント・初期化 */
-document.getElementById("modeSelect").onchange = e => {
-  setFormatFromMode(e.target.value);
-};
-document.getElementById("teamCountSelect").onchange = () => {
-  createEnemyTeamEditor();
-};
-
-setFormatFromMode("6v6");
-createTeamNameEditor();
-</script>
-
-</body>
-</html>
-
+    // ===== 名前・
