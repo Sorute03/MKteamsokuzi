@@ -134,22 +134,71 @@
   })();
 
 
-  // ===== OCR共通関数 =====
-  async function ocrRegion(video, region) {
-    const c = document.createElement("canvas");
-    c.width = region.width;
-    c.height = region.height;
-    const ctx = c.getContext("2d");
+  // ===== MK8DX専用 OCR前処理（精度爆上げ） =====
+function preprocessForOCR(video, region) {
+  const c = document.createElement("canvas");
+  c.width = region.width * 2;   // 拡大（精度UP）
+  c.height = region.height * 2;
+  const ctx = c.getContext("2d");
 
-    ctx.drawImage(
-      video,
-      region.x, region.y, region.width, region.height,
-      0, 0, region.width, region.height
-    );
+  // 拡大して描画
+  ctx.drawImage(
+    video,
+    region.x, region.y, region.width, region.height,
+    0, 0, c.width, c.height
+  );
 
-    const { data: { text } } = await Tesseract.recognize(c, "jpn");
-    return text;
+  // 画像データ取得
+  let img = ctx.getImageData(0, 0, c.width, c.height);
+  let data = img.data;
+
+  // グレースケール + コントラスト強化 + ガンマ補正 + 二値化
+  for (let i = 0; i < data.length; i += 4) {
+    let r = data[i];
+    let g = data[i + 1];
+    let b = data[i + 2];
+
+    // グレースケール
+    let v = 0.299 * r + 0.587 * g + 0.114 * b;
+
+    // コントラスト強化
+    v = v < 128 ? v * 0.7 : v * 1.4;
+
+    // ガンマ補正
+    v = Math.pow(v / 255, 0.6) * 255;
+
+    // 二値化
+    v = v > 140 ? 255 : 0;
+
+    data[i] = data[i + 1] = data[i + 2] = v;
   }
+
+  ctx.putImageData(img, 0, 0);
+
+  return c;
+}
+
+
+  // ===== OCR共通関数 =====
+
+    
+    // ===== OCR共通関数（前処理＋Tesseract設定） =====
+  async function ocrRegion(video, region) {
+    const processedCanvas = preprocessForOCR(video, region);
+  
+    const { data: { text } } = await Tesseract.recognize(
+      processedCanvas,
+      "jpn",
+      {
+        tessedit_char_whitelist: "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz★☆+- ",
+        psm: 7,  // 単一行モード
+        oem: 1   // LSTM
+      }
+    );
+  
+    return text.trim();
+  }
+
 
   // ===== 名前・点数の領域計算（12人 / 24人対応） =====
   function calcNameRegion(i, videoWidth, videoHeight) {
@@ -176,34 +225,34 @@
     };
   }
 
-  // ===== 名前・点数の OCR =====
   async function ocrNames(video, count) {
     const names = [];
     const vw = video.videoWidth;
     const vh = video.videoHeight;
-
+  
     for (let i = 0; i < count; i++) {
       const region = calcNameRegion(i, vw, vh);
       const text = await ocrRegion(video, region);
-      names.push(text.trim());
+      names.push(text);
     }
-
+  
     return names;
   }
-
+  
   async function ocrScores(video, count) {
     const scores = [];
     const vw = video.videoWidth;
     const vh = video.videoHeight;
-
+  
     for (let i = 0; i < count; i++) {
       const region = calcScoreRegion(i, vw, vh);
       const text = await ocrRegion(video, region);
-      scores.push(text.trim());
+      scores.push(text);
     }
-
+  
     return scores;
   }
+
 
   // ===== OCR実行 → プレイヤー編集UI生成 =====
   runOcrBtn.onclick = async () => {
