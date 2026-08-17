@@ -74,85 +74,213 @@
   <video id="cam" autoplay playsinline></video>
 
   <script>
-    // ===== カメラ周り =====
-    const cameraSelect   = document.getElementById("cameraSelect");
-    const startCamBtn    = document.getElementById("startCam");
-    const video          = document.getElementById("cam");
-    const playerCountSel = document.getElementById("playerCount");
-    const runOcrBtn      = document.getElementById("runOcr");
-    const playerInputs   = document.getElementById("playerInputs");
-    const forceRecalcBtn = document.getElementById("forceRecalc");
-    const teamTagsInput  = document.getElementById("teamTags");
-    const formatSel      = document.getElementById("format");
-    const resultPre      = document.getElementById("result");
+  // ===== カメラ周り =====
+  const cameraSelect   = document.getElementById("cameraSelect");
+  const startCamBtn    = document.getElementById("startCam");
+  const video          = document.getElementById("cam");
+  const playerCountSel = document.getElementById("playerCount");
+  const runOcrBtn      = document.getElementById("runOcr");
+  const playerInputs   = document.getElementById("playerInputs");
+  const forceRecalcBtn = document.getElementById("forceRecalc");
+  const teamTagsInput  = document.getElementById("teamTags");
+  const formatSel      = document.getElementById("format");
+  const resultPre      = document.getElementById("result");
 
-    async function loadCameras() {
-      const devices = await navigator.mediaDevices.enumerateDevices();
-      const cams = devices.filter(d => d.kind === "videoinput");
-
-      cameraSelect.innerHTML = "";
-      cams.forEach(cam => {
-        const opt = document.createElement("option");
-        opt.value = cam.deviceId;
-        opt.textContent = cam.label || `Camera ${cameraSelect.length + 1}`;
-        cameraSelect.appendChild(opt);
-      });
+  // ---- ① 権限を先に取る（これがないと enumerateDevices が空になる） ----
+  async function requestPermission() {
+    try {
+      await navigator.mediaDevices.getUserMedia({ video: true });
+    } catch (e) {
+      alert("カメラの権限が必要です");
     }
+  }
 
-    async function startCamera(deviceId) {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { deviceId: { exact: deviceId } }
-      });
-      video.srcObject = stream;
+  // ---- ② 権限取得後にカメラ一覧を取得 ----
+  async function loadCameras() {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const cams = devices.filter(d => d.kind === "videoinput");
+
+    cameraSelect.innerHTML = "";
+
+    cams.forEach(cam => {
+      const opt = document.createElement("option");
+      opt.value = cam.deviceId;
+      opt.textContent = cam.label || `Camera ${cameraSelect.length + 1}`;
+      cameraSelect.appendChild(opt);
+    });
+
+    if (cams.length === 0) {
+      alert("カメラが見つかりません。OBS 仮想カメラを起動していますか？");
     }
+  }
 
-    startCamBtn.onclick = () => {
-      const id = cameraSelect.value;
-      if (id) startCamera(id);
+  // ---- ③ カメラ開始 ----
+  async function startCamera(deviceId) {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { deviceId: { exact: deviceId } }
+    });
+    video.srcObject = stream;
+  }
+
+  startCamBtn.onclick = () => {
+    const id = cameraSelect.value;
+    if (id) startCamera(id);
+  };
+
+  // ---- ページ読み込み時に権限 → カメラ一覧 ----
+  (async () => {
+    await requestPermission();
+    await loadCameras();
+  })();
+
+
+  // ===== OCR共通関数 =====
+  async function ocrRegion(video, region) {
+    const c = document.createElement("canvas");
+    c.width = region.width;
+    c.height = region.height;
+    const ctx = c.getContext("2d");
+
+    ctx.drawImage(
+      video,
+      region.x, region.y, region.width, region.height,
+      0, 0, region.width, region.height
+    );
+
+    const { data: { text } } = await Tesseract.recognize(c, "jpn");
+    return text;
+  }
+
+  // ===== 名前・点数の領域計算（12人 / 24人対応） =====
+  function calcNameRegion(i, videoWidth, videoHeight) {
+    const count = parseInt(playerCountSel.value);
+    const rowHeight = videoHeight / count;
+
+    return {
+      x: videoWidth * 0.18,
+      y: rowHeight * i,
+      width: videoWidth * 0.32,
+      height: rowHeight
     };
+  }
 
-    loadCameras();
+  function calcScoreRegion(i, videoWidth, videoHeight) {
+    const count = parseInt(playerCountSel.value);
+    const rowHeight = videoHeight / count;
 
-    // ===== OCR共通関数 =====
-    async function ocrRegion(video, region) {
-      const c = document.createElement("canvas");
-      c.width = region.width;
-      c.height = region.height;
-      const ctx = c.getContext("2d");
+    return {
+      x: videoWidth * 0.63,
+      y: rowHeight * i,
+      width: videoWidth * 0.10,
+      height: rowHeight
+    };
+  }
 
-      ctx.drawImage(
-        video,
-        region.x, region.y, region.width, region.height,
-        0, 0, region.width, region.height
-      );
+  // ===== 名前・点数の OCR =====
+  async function ocrNames(video, count) {
+    const names = [];
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
 
-      const { data: { text } } = await Tesseract.recognize(c, "jpn");
-      return text;
+    for (let i = 0; i < count; i++) {
+      const region = calcNameRegion(i, vw, vh);
+      const text = await ocrRegion(video, region);
+      names.push(text.trim());
     }
 
-    // ===== 名前・点数の領域計算（12人 / 24人対応） =====
-    function calcNameRegion(i, videoWidth, videoHeight) {
-      const count = parseInt(playerCountSel.value);
-      const rowHeight = videoHeight / count;
+    return names;
+  }
 
-      return {
-        x: videoWidth * 0.18,
-        y: rowHeight * i,
-        width: videoWidth * 0.32,
-        height: rowHeight
-      };
+  async function ocrScores(video, count) {
+    const scores = [];
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+
+    for (let i = 0; i < count; i++) {
+      const region = calcScoreRegion(i, vw, vh);
+      const text = await ocrRegion(video, region);
+      scores.push(text.trim());
     }
 
-    function calcScoreRegion(i, videoWidth, videoHeight) {
-      const count = parseInt(playerCountSel.value);
-      const rowHeight = videoHeight / count;
+    return scores;
+  }
 
-      return {
-        x: videoWidth * 0.63,
-        y: rowHeight * i,
-        width: videoWidth * 0.10,
-        height: rowHeight
-      };
-    }
+  // ===== OCR実行 → プレイヤー編集UI生成 =====
+  runOcrBtn.onclick = async () => {
+    const count = parseInt(playerCountSel.value);
 
-    // ===== 名前・
+    const names  = await ocrNames(video, count);
+    const scores = await ocrScores(video, count);
+
+    renderPlayerInputs(names, scores);
+  };
+
+  function renderPlayerInputs(names, scores) {
+    playerInputs.innerHTML = "";
+
+    names.forEach((name, i) => {
+      const row = document.createElement("div");
+      row.className = "player-row";
+
+      row.innerHTML = `
+        <input class="name"    value="${name}">
+        <input class="score"   value="${scores[i]}">
+        <input class="bonus"   value="0" placeholder="+補正">
+        <input class="penalty" value="0" placeholder="-ペナルティ">
+      `;
+
+      playerInputs.appendChild(row);
+    });
+  }
+
+  // ===== 再集計（補正＋ペナルティ反映） =====
+  forceRecalcBtn.onclick = () => {
+    const rows = document.querySelectorAll(".player-row");
+
+    const names = [];
+    const finalScores = [];
+
+    rows.forEach(row => {
+      const name    = row.querySelector(".name").value.trim();
+      const score   = parseInt(row.querySelector(".score").value.trim())   || 0;
+      const bonus   = parseInt(row.querySelector(".bonus").value.trim())   || 0;
+      const penalty = parseInt(row.querySelector(".penalty").value.trim()) || 0;
+
+      names.push(name);
+      finalScores.push(score + bonus - penalty);
+    });
+
+    const teamTags = teamTagsInput.value.split(",").map(s => s.trim()).filter(Boolean);
+    const teamCount = teamTags.length;
+    const format = formatSel.value;
+
+    const teams = buildTeams(names, finalScores, teamTags, teamCount);
+
+    resultPre.textContent = JSON.stringify(teams, null, 2);
+
+    // generateStatsImage(teams, format); ←あなたの既存ロジックをここに繋ぐ
+  };
+
+  // ===== チーム分け（teamTagベース） =====
+  function buildTeams(names, scores, teamTags, teamCount) {
+    const teams = {};
+
+    teamTags.forEach(tag => {
+      teams[tag] = { tag, members: [], total: 0 };
+    });
+
+    names.forEach((name, i) => {
+      const score = scores[i];
+      const tag = teamTags.find(t => name.startsWith(t));
+
+      if (tag) {
+        teams[tag].members.push({ name, score });
+        teams[tag].total += score;
+      }
+    });
+
+    return teams;
+  }
+</script>
+</body>
+</html>
