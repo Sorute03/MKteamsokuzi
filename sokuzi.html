@@ -39,6 +39,12 @@
 
   <input type="file" id="fileInput" accept="video/*,image/*" style="display:none;">
 </div>
+  
+<!-- カメラ選択（復活） -->
+<div id="cameraBox">
+  <select id="cameraSelect"></select>
+  <button id="startCam">カメラ開始</button>
+</div>
 
 
   <!-- プレイヤー人数 -->
@@ -155,6 +161,16 @@ fileInput.onchange = async (e) => {
       video.srcObject = null;
       video.src = c.toDataURL();
     };
+  }
+};
+
+sourceType.onchange = () => {
+  if (sourceType.value === "camera") {
+    fileInput.style.display = "none";
+    document.getElementById("cameraBox").style.display = "block";
+  } else {
+    fileInput.style.display = "inline-block";
+    document.getElementById("cameraBox").style.display = "none";
   }
 };
 
