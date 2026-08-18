@@ -143,6 +143,7 @@ fileInput.onchange = async (e) => {
     const url = URL.createObjectURL(file);
     video.srcObject = null;
     video.src = url;
+    video.controls = true;   // ★ シークバー表示
     video.play();
   }
 
@@ -150,17 +151,21 @@ fileInput.onchange = async (e) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.src = url;
+
     img.onload = () => {
       const c = document.createElement("canvas");
       c.width = img.width;
       c.height = img.height;
       const ctx = c.getContext("2d");
       ctx.drawImage(img, 0, 0);
+
       video.srcObject = null;
       video.src = c.toDataURL();
+      video.controls = false; // ★ 画像はコントロール不要
     };
   }
 };
+
 
 /* 権限取得 */
 async function requestPermission() {
@@ -199,7 +204,10 @@ async function startCamera(deviceId) {
 
 startCamBtn.onclick = () => {
   const id = cameraSelect.value;
-  if (id) startCamera(id);
+  if (id) {
+    startCamera(id);
+    video.controls = false; // ★ カメラはシークバー不要
+  }
 };
 
 /* 初期化 */
