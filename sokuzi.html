@@ -503,15 +503,24 @@ function isFinalResultScreen(video) {
 /* 自動OCRループ */
 async function autoOcrLoop() {
   if (!autoOcrRunning) return;
+
   await waitForVideoReady(video);
+
   if (isFinalResultScreen(video)) {
+    // 最終リザルト → 名前＋点数
     const count = parseInt(playerCountSel.value);
     const names  = await ocrNames(video, count);
     const scores = await ocrScores(video, count);
     renderPlayerInputs(names, scores);
+  } else {
+    // 途中結果 → 点数だけ
+    const scores = await ocrScores(video, 4); // 赤青黄緑の4チーム
+    renderPlayerInputs(["赤","青","黄","緑"], scores);
   }
+
   requestAnimationFrame(autoOcrLoop);
 }
+
 
 
 // 白文字抽出（MK8DX専用）
