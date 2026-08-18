@@ -389,6 +389,9 @@ function renderPlayerInputs(names, scores) {
 
 /* OCR実行ボタン */
 runOcrBtn.onclick = async () => {
+  // ★ ここが重要：video の準備ができるまで待つ
+  await waitForVideoReady(video);
+
   const count = parseInt(playerCountSel.value);
 
   const names  = await ocrNames(video, count);
@@ -396,6 +399,18 @@ runOcrBtn.onclick = async () => {
 
   renderPlayerInputs(names, scores);
 };
+
+
+async function waitForVideoReady(video) {
+  return new Promise(resolve => {
+    if (video.readyState >= 2 && video.videoWidth > 0) {
+      resolve();
+    } else {
+      video.onloadeddata = () => resolve();
+    }
+  });
+}
+
 
 /* ============================
    再集計
