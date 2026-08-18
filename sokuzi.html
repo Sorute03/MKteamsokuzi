@@ -643,22 +643,24 @@ function preprocessScoreOCR(video, region) {
   let img = ctx.getImageData(0, 0, c.width, c.height);
   let data = img.data;
 
-  // 白文字抽出（数字はほぼ白）
   for (let i = 0; i < data.length; i += 4) {
     const r = data[i], g = data[i+1], b = data[i+2];
     const v = (r + g + b) / 3;
-    data[i] = data[i+1] = data[i+2] = (v > 200 ? 255 : 0);
+
+    // ★ 黒文字抽出（黒→白、白→黒）
+    if (v < 100) {
+      // 黒文字 → 白にする
+      data[i] = data[i+1] = data[i+2] = 255;
+    } else {
+      // 背景 → 黒にする
+      data[i] = data[i+1] = data[i+2] = 0;
+    }
   }
-
-  // 輪郭強調
-  edgeEnhance(img);
-
-  // 文字を太くする
-  thicken(img);
 
   ctx.putImageData(img, 0, 0);
   return c;
 }
+
 
 async function ocrScoreOnce(video, region) {
   const canvas = preprocessScoreOCR(video, region);
@@ -675,6 +677,7 @@ async function ocrScoreOnce(video, region) {
 
   return text.trim();
 }
+
 
 
 function correctScore(a, b) {
