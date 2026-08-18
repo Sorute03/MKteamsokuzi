@@ -277,7 +277,7 @@ async function ocrRegion(video, region) {
     "サザシジスズセゼソゾタダチヂツヅテデトド" +
     "ナニヌネノハバパヒビピフブプヘベペホボポ" +
     "マミムメモヤユヨラリルレロワヲン" +
-    "★☆+-_[](){}<>!?/\\|"^";
+    "★☆+-_[](){}<>!?/\\|^";
 
   const { data: { text } } = await Tesseract.recognize(
     canvas,
@@ -690,17 +690,17 @@ function correctScore(a, b) {
 
     let num = parseInt(v);
 
-    // ★ 180までの数字だけ採用
+    // 0〜180 の数字だけ採用
     if (num >= 0 && num <= 180) {
       candidates.push(num);
       return;
     }
 
-    // ★ 180を超える場合 → 末尾の0を削る（例：1800 → 180）
+    // 180 を超える場合 → 末尾の 0 を削る（例：1800 → 180）
     while (num > 180 && v.length > 1) {
-      v = v.slice(0, -1); // 末尾を削る
+      v = v.slice(0, -1);
       num = parseInt(v);
-      if (num <= 180) {
+      if (num >= 0 && num <= 180) {
         candidates.push(num);
         return;
       }
@@ -715,7 +715,6 @@ function correctScore(a, b) {
   // それでも取れない → 0扱い
   return "0";
 }
-
 
 
 </script>
