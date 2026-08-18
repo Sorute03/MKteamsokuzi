@@ -269,7 +269,7 @@ async function ocrRegion(video, region) {
     "サザシジスズセゼソゾタダチヂツヅテデトド" +
     "ナニヌネノハバパヒビピフブプヘベペホボポ" +
     "マミムメモヤユヨラリルレロワヲン" +
-    "★☆+-_[](){}<>!?/\\|";
+    "★☆+-_[](){}<>!?/\\|"^;
 
   const { data: { text } } = await Tesseract.recognize(
     canvas,
