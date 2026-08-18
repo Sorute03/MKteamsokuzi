@@ -156,7 +156,11 @@ startCamBtn.onclick = () => {
    teamTag 自動生成
 ============================ */
 function renderTeamTagInputs() {
-  const teamCount = parseInt(formatSel.value);
+  const mode = formatSel.value;   // "2v2" など
+  const teamSize = parseInt(mode.split("v")[0]); // 左側の数字（2,3,4,6,8,12）
+
+  const teamCount = 24 / teamSize; // MK8DXは24人固定
+
   teamTagContainer.innerHTML = "";
 
   for (let i = 0; i < teamCount; i++) {
@@ -166,6 +170,7 @@ function renderTeamTagInputs() {
     teamTagContainer.appendChild(input);
   }
 }
+
 
 formatSel.onchange = renderTeamTagInputs;
 renderTeamTagInputs();
