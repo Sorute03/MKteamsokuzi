@@ -29,11 +29,17 @@
 
 <body>
 
-  <!-- カメラ選択 -->
-  <div>
-    <select id="cameraSelect"></select>
-    <button id="startCam">カメラ開始</button>
-  </div>
+<div>
+  <label>OCRソース選択:</label>
+  <select id="sourceType">
+    <option value="camera">カメラ</option>
+    <option value="video">動画ファイル</option>
+    <option value="image">画像ファイル</option>
+  </select>
+
+  <input type="file" id="fileInput" accept="video/*,image/*" style="display:none;">
+</div>
+
 
   <!-- プレイヤー人数 -->
   <div>
@@ -105,6 +111,52 @@ const forceRecalcBtn = document.getElementById("forceRecalc");
 const formatSel      = document.getElementById("format");
 const teamTagContainer = document.getElementById("teamTagContainer");
 const resultPre      = document.getElementById("result");
+
+const sourceType = document.getElementById("sourceType");
+const fileInput  = document.getElementById("fileInput");
+
+// ソース切り替え
+sourceType.onchange = () => {
+  if (sourceType.value === "camera") {
+    fileInput.style.display = "none";
+  } else {
+    fileInput.style.display = "inline-block";
+  }
+};
+
+// ファイル読み込み
+fileInput.onchange = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  if (sourceType.value === "video") {
+    const url = URL.createObjectURL(file);
+    video.srcObject = null;
+    video.src = url;
+    video.play();
+  }
+
+  if (sourceType.value === "image") {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.src = url;
+
+    img.onload = () => {
+      // 画像を video に変換（canvas経由）
+      const c = document.createElement("canvas");
+      c.width = img.width;
+      c.height = img.height;
+      const ctx = c.getContext("2d");
+      ctx.drawImage(img, 0, 0);
+
+      // video に画像を流し込む
+      video.srcObject = null;
+      video.src = c.toDataURL();
+    };
+  }
+};
+
+
 
 /* 権限取得 */
 async function requestPermission() {
