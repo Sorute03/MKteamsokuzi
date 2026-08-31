@@ -266,22 +266,9 @@ function preprocessForOCR(video, region) {
 async function ocrRegion(video, region) {
   const canvas = preprocessForOCR(video, region);
 
-  const whitelist =
-    "0123456789" +
-    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz" +
-    "ぁあぃいぅうぇえぉおかがきぎくぐけげこご" +
-    "さざしじすずせぜそぞただちぢつづてでとど" +
-    "なにぬねのはばぱひびぴふぶぷへべぺほぼぽ" +
-    "まみむめもやゆよらりるれろわをん" +
-    "ァアィイゥウェエォオカガキギクグケゲコゴ" +
-    "サザシジスズセゼソゾタダチヂツヅテデトド" +
-    "ナニヌネノハバパヒビピフブプヘベペホボポ" +
-    "マミムメモヤユヨラリルレロワヲン" +
-    "★☆+-_[](){}<>!?/\\|^";
-
   const { data: { text } } = await Tesseract.recognize(
     canvas,
-    "jpn",
+    "jpn+eng+osd+equ",   // ★ 日本語＋英語＋数字＋記号＋ギリシャ文字
     {
       tessedit_char_whitelist: whitelist,
       psm: 7,
@@ -289,8 +276,112 @@ async function ocrRegion(video, region) {
     }
   );
 
-  return text.trim();
+  return normalizeNameChars(text.trim());
 }
+
+const whitelist =
+  "0123456789" +
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz" +
+
+  // 日本語（ひらがな）
+  "ぁあぃいぅうぇえぉおかがきぎくぐけげこご" +
+  "さざしじすずせぜそぞただちぢつづてでとど" +
+  "なにぬねのはばぱひびぴふぶぷへべぺほぼぽ" +
+  "まみむめもやゆよらりるれろわをん" +
+
+  // 日本語（カタカナ）
+  "ァアィイゥウェエォオカガキギクグケゲコゴ" +
+  "サザシジスズセゼソゾタダチヂツヅテデトド" +
+  "ナニヌネノハバパヒビピフブプヘベペホボポ" +
+  "マミムメモヤユヨラリルレロワヲン" +
+
+  // ギリシャ文字（小文字）
+  "αβγδεζηθικλμνξοπρστυφχψω" +
+
+  // ギリシャ文字（大文字）
+  "ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩ" +
+
+  // 記号
+  "!?" +
+  "★☆+-_[](){}<>/\\|" +
+
+  // 伸ばし棒（全種類）
+  "ー－―—ｰ‐-" +
+
+  // スペース（半角・全角）
+  " " +
+  "　";
+
+function normalizeNameChars(name) {
+  return name
+    // スペース
+    .replace(/　/g, " ")   // 全角スペース → 半角
+
+    // 記号（全角 → 半角）
+    .replace(/！/g, "!")
+    .replace(/？/g, "?")
+
+    // 伸ばし棒を全部 "-" に統一
+    .replace(/ー|－|―|—|ｰ|‐/g, "-")
+
+    .trim();
+}
+
+  
+
+function correctNameForTeamTag(name, teamTags) {
+  const normalized = normalizeNameChars(name);
+
+  // タグが先頭にあるかチェック
+  for (const tag of teamTags) {
+    if (normalized.startsWith(tag)) {
+      return normalized;
+    }
+  }
+
+  // タグ欠損 → 最も近いタグを補完
+  let bestTag = null;
+  let bestScore = Infinity;
+
+  for (const tag of teamTags) {
+    const score = levenshtein(
+      normalized.slice(0, tag.length).toLowerCase(),
+      tag.toLowerCase()
+    );
+    if (score < bestScore) {
+      bestScore = score;
+      bestTag = tag;
+    }
+  }
+
+  if (bestScore <= 1) {
+    return bestTag + normalized;
+  }
+
+  return normalized;
+}
+
+
+function levenshtein(a, b) {
+  const dp = Array(a.length + 1).fill(null)
+    .map(() => Array(b.length + 1).fill(0));
+
+  for (let i = 0; i <= a.length; i++) dp[i][0] = i;
+  for (let j = 0; j <= b.length; j++) dp[0][j] = j;
+
+  for (let i = 1; i <= a.length; i++) {
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(
+        dp[i - 1][j] + 1,
+        dp[i][j - 1] + 1,
+        dp[i - 1][j - 1] + cost
+      );
+    }
+  }
+  return dp[a.length][b.length];
+}
+
 
 /* OCR領域計算 */
 function calcNameRegion(i, vw, vh) {
@@ -317,9 +408,8 @@ function calcScoreRegion(i, vw, vh) {
 
 /* 名前・点数 OCR */
 async function ocrNames(video, count) {
-  // 最終リザルト画面以外では名前OCRしない
   if (!isFinalResultScreen(video)) {
-    return Array(count).fill(""); // 空欄で返す
+    return Array(count).fill(""); // 途中経過では名前OCRしない
   }
 
   const names = [];
@@ -334,13 +424,13 @@ async function ocrNames(video, count) {
     const region = calcNameRegion(i, vw, vh);
     let text = await ocrRegion(video, region);
 
-    // teamTag補正
     text = correctNameForTeamTag(text, teamTags);
 
     names.push(text);
   }
   return names;
 }
+
 
 
 async function ocrScores(video, count) {
@@ -612,35 +702,6 @@ async function ocrScoreRegion(video, region) {
 }
 
 
-function correctNameForTeamTag(name, teamTags) {
-  const normalized = name.replace(/ /g, "").trim();
-
-  // teamTag が先頭に含まれているかチェック
-  for (const tag of teamTags) {
-    if (normalized.startsWith(tag)) {
-      return normalized; // そのままでOK
-    }
-  }
-
-  // OCRがタグを欠損した場合 → 最も近いタグを補完
-  let bestTag = null;
-  let bestScore = Infinity;
-
-  for (const tag of teamTags) {
-    const score = levenshtein(normalized.slice(0, tag.length).toLowerCase(), tag.toLowerCase());
-    if (score < bestScore) {
-      bestScore = score;
-      bestTag = tag;
-    }
-  }
-
-  // タグが近ければ補完する
-  if (bestScore <= 1) {
-    return bestTag + normalized;
-  }
-
-  return normalized;
-}
 
 function preprocessScoreOCR(video, region) {
   const c = document.createElement("canvas");
