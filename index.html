@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <title>MKteamsokuzi</title>
-
+<script src="https://unpkg.com/obs-websocket-js"></script>
 <style>
 body { margin:0; padding:10px; font-family:sans-serif; }
 /* 通常は上にある */
@@ -1607,55 +1607,127 @@ async function sendInstantScore() {
 }
 
 
-async function sendInstantScoreMulti(silent = false) {
-  // ★ ON の Webhook だけ抽出
-  const enabledWebhooks = webhookList.filter(w => w.enabled);
+/* ============================================================
+   OBS Custom Event (Payload) 送信処理
+============================================================ */
 
-  if (!enabledWebhooks.length) {
-    if (!silent) alert("有効な Webhook がありません");
+const obs = new OBSWebSocket();
+
+async function connectOBS(verbose = false) {
+  const url = document.getElementById("obsUrlInput")?.value || "ws://localhost:4455";
+  const password = document.getElementById("obsPasswordInput")?.value || "";
+  const statusEl = document.getElementById("obsStatus");
+
+  try {
+    if (obs.socket && obs.socket.readyState === WebSocket.OPEN) {
+      await obs.disconnect();
+    }
+    await obs.connect(url, password);
+    if (statusEl) {
+      statusEl.textContent = "接続成功";
+      statusEl.style.color = "green";
+    }
+    if (verbose) alert("OBS WebSocket への接続に成功しました！");
+    return true;
+  } catch (error) {
+    console.error("OBS 接続エラー:", error);
+    if (statusEl) {
+      statusEl.textContent = "接続失敗";
+      statusEl.style.color = "red";
+    }
+    if (verbose) alert("OBS への接続に失敗しました: " + error.message);
+    return false;
+  }
+}
+
+/**
+ * OBSブラウザソース向けに payload データを Broadcast 送信する関数
+ */
+async function sendOBSPayload(payloadData) {
+  try {
+    if (!obs.socket || obs.socket.readyState !== WebSocket.OPEN) {
+      const connected = await connectOBS(false);
+      if (!connected) return;
+    }
+
+    // OBSへカスタムイベントとして payload をブロードキャスト
+    await obs.call("BroadcastCustomEvent", {
+      vendorName: "mk-sokuzi", // イベントを識別する任意の名前
+      eventData: payloadData
+    });
+
+    console.log("OBS Payload 送信成功:", payloadData);
+  } catch (e) {
+    console.warn("OBS Payload 送信失敗:", e);
+  }
+}
+
+/* ============================================================
+   即時集計送信（Webhook ＋ OBS Payload 対応版）
+============================================================ */
+
+async function sendInstantScoreMulti(silent = false) {
+  const ranking = calcRanking();
+  if (!ranking.length) {
+    if (!silent) alert("スコアがありません");
     return;
   }
 
-  const ranking = calcRanking();
-  if (!ranking.length) return;
-
   const top = ranking[0].score;
 
-  const text =
-    `【即時集計】\n\n` +
-    ranking.map((t, i) => {
-      const diff = t.score - top;
-      return `${i + 1}位：${t.team} ${t.score}点 ${diff === 0 ? "" : `(${diff})`}`;
-    }).join("\n");
-
-  const payload = {
-    username: "MK Sokuzi",
-    embeds: [
-      {
-        title: `📊 現在のスコア（自チーム：${state.myTeam}）`,
-        description: text,
-        color: 3447003,
-        timestamp: new Date().toISOString()
-      }
-    ]
+  // 1. OBS（ブラウザソース）へ渡す Payload 構造体の作成
+  const scorePayload = {
+    myTeam: state.myTeam,
+    timestamp: new Date().toISOString(),
+    ranking: ranking.map((t, i) => ({
+      rank: i + 1,
+      team: t.team,
+      score: t.score,
+      diff: t.score - top,
+      isMyTeam: t.team === state.myTeam
+    }))
   };
 
-  // ★ ON の Webhook だけに送信
-  for (const w of enabledWebhooks) {
-    try {
-      await fetch(w.url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-    } catch (e) {
-      console.warn("Webhook 送信失敗:", w.url, e);
+  // 2. OBSに Payload を送信
+  await sendOBSPayload(scorePayload);
+
+  // 3. 有効な Webhook へ送信（従来通り）
+  const enabledWebhooks = webhookList.filter(w => w.enabled);
+  if (enabledWebhooks.length) {
+    const text =
+      `【即時集計】\n\n` +
+      ranking.map((t, i) => {
+        const diff = t.score - top;
+        return `${i + 1}位：${t.team} ${t.score}点 ${diff === 0 ? "" : `(${diff})`}`;
+      }).join("\n");
+
+    const discordPayload = {
+      username: "MK Sokuzi",
+      embeds: [
+        {
+          title: `📊 現在のスコア（自チーム：${state.myTeam}）`,
+          description: text,
+          color: 3447003,
+          timestamp: new Date().toISOString()
+        }
+      ]
+    };
+
+    for (const w of enabledWebhooks) {
+      try {
+        await fetch(w.url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(discordPayload)
+        });
+      } catch (e) {
+        console.warn("Webhook 送信失敗:", w.url, e);
+      }
     }
   }
 
-  if (!silent) alert("途中経過を送信しました");
+  if (!silent) alert("途中経過（Payload）を送信しました");
 }
-
 
 /* ============================================================
    分析関連
