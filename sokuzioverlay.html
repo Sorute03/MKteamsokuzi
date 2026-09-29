@@ -1,99 +1,305 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html>
 <head>
 <meta charset="UTF-8">
-<title>OBS Score Overlay</title>
-<script src="https://unpkg.com/obs-websocket-js"></script>
+<title>MK Sokuzi Overlay</title>
+
 <style>
   body {
     margin: 0;
-    padding: 20px;
+    padding: 0;
     background: transparent;
-    font-family: 'Segoe UI', sans-serif;
-    color: #fff;
+    font-family: 'Segoe UI', Meiryo, sans-serif;
+    color: white;
   }
-  .container {
-    width: 320px;
-    background: rgba(15, 23, 42, 0.85);
+
+  /* 集計表示エリア */
+  #overlayBox {
+    position: absolute;
+    bottom: 25px;
+    right: 25px;
+    background: rgba(15, 23, 42, 0.88);
+    border: 2px solid rgba(255, 255, 255, 0.15);
     border-radius: 12px;
-    padding: 16px;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    padding: 16px 20px;
+    min-width: 300px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
     backdrop-filter: blur(8px);
-    border: 1px solid rgba(255,255,255,0.1);
   }
-  .title {
-    font-size: 14px;
-    font-weight: bold;
-    color: #94a3b8;
-    margin-bottom: 12px;
-    text-transform: uppercase;
-  }
-  .row {
+
+  .header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 8px 10px;
-    margin-bottom: 6px;
-    background: rgba(255,255,255,0.05);
+    font-size: 13px;
+    font-weight: bold;
+    color: #94a3b8;
+    margin-bottom: 10px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .team-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .team-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 10px;
     border-radius: 6px;
+    background: rgba(255, 255, 255, 0.05);
   }
-  .row.my-team {
-    background: rgba(59, 130, 246, 0.3);
-    border: 1px solid rgba(59, 130, 246, 0.6);
+
+  .team-row.my-team {
+    background: rgba(56, 189, 248, 0.15);
+    border-left: 4px solid #38bdf8;
   }
-  .rank { font-weight: bold; width: 30px; }
-  .team-name { flex-grow: 1; }
-  .score { font-weight: bold; margin-right: 8px; }
-  .diff { font-size: 12px; color: #cbd5e1; }
+
+  .rank-badge {
+    font-size: 14px;
+    font-weight: 800;
+    width: 24px;
+    color: #cbd5e1;
+  }
+
+  .team-name {
+    font-size: 16px;
+    font-weight: 600;
+    flex: 1;
+    margin: 0 10px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .score-val {
+    font-size: 20px;
+    font-weight: 800;
+    color: #f8fafc;
+    min-width: 45px;
+    text-align: right;
+  }
+
+  .diff-val {
+    font-size: 13px;
+    font-weight: 700;
+    min-width: 50px;
+    text-align: right;
+    margin-left: 8px;
+  }
+
+  .diff-plus { color: #4ade80; }  /* プラス差分 (緑) */
+  .diff-minus { color: #f87171; } /* マイナス差分 (赤) */
+  .diff-zero { color: #64748b; }  /* 基準/同点 */
+
+  /* OBS設定パネル */
+  #configBox {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    background: rgba(0, 0, 0, 0.9);
+    padding: 16px;
+    border-radius: 8px;
+    font-size: 14px;
+    z-index: 999;
+  }
+
+  #configBox input {
+    margin: 4px 0;
+    padding: 6px;
+    width: 180px;
+    display: block;
+    border: 1px solid #475569;
+    border-radius: 4px;
+    background: #1e293b;
+    color: #fff;
+  }
+
+  #configBox button {
+    margin-top: 8px;
+    padding: 6px 12px;
+    background: #2563eb;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
+  #statusText {
+    margin-top: 6px;
+    font-size: 12px;
+    color: #f87171;
+  }
 </style>
+
+<!-- PeerJS ライブラリ -->
+<script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+
+<!-- OBS WebSocket ライブラリ -->
+<script src="https://cdn.jsdelivr.net/npm/obs-websocket-js@5.0.3/dist/obs-ws.min.js"></script>
 </head>
 <body>
 
-<div class="container">
-  <div class="title" id="overlayTitle">SCOREBOARD</div>
-  <div id="rankingList"></div>
+<!-- OBS接続設定フォーム -->
+<div id="configBox">
+  <b>OBS WebSocket 接続設定</b>
+  <input type="text" id="obsHost" placeholder="localhost" value="localhost">
+  <input type="text" id="obsPort" placeholder="4455" value="4455">
+  <input type="password" id="obsPassword" placeholder="OBSパスワード">
+  <button onclick="initOBS()">接続して非表示</button>
+  <div id="statusText"></div>
+</div>
+
+<!-- 即時集計表示エリア -->
+<div id="overlayBox">
+  <div class="header">
+    <span>試合待機中</span>
+  </div>
 </div>
 
 <script>
-  const obs = new OBSWebSocket();
-
-  async function initOBS() {
-    try {
-      // OBS内部のブラウザソースから接続するため localhost 指定
-      await obs.connect("ws://localhost:4455", "YOUR_OBS_PASSWORD");
-      console.log("OBS Overlay Connected");
-
-      // 送信側からの CustomEvent (Payload) を待機
-      obs.on("CustomEvent", (data) => {
-        if (data.vendorName === "mk-sokuzi") {
-          renderOverlay(data.eventData);
-        }
-      });
-
-    } catch (e) {
-      console.error("Overlay OBS Connection Failed:", e);
-    }
+// ======================================================
+// 1. window.postMessage 受信 (openOverlay用)
+// ======================================================
+window.addEventListener("message", (e) => {
+  if (e.data && e.data.type === "MKADP_SOKUZI_UPDATE") {
+    renderOverlay(e.data);
   }
+});
 
-  function renderOverlay(payload) {
-    const titleEl = document.getElementById("overlayTitle");
-    const listEl = document.getElementById("rankingList");
+// ======================================================
+// 2. PeerJS 連携処理
+// ======================================================
+const params = new URLSearchParams(location.search);
+const USER = params.get("user");
 
-    if (titleEl) {
-      titleEl.textContent = `自チーム: ${payload.myTeam}`;
+if (USER) {
+  const peer = new Peer("overlay-" + USER);
+  peer.on("connection", conn => {
+    conn.on("data", data => {
+      if (data && data.type === "MKADP_SOKUZI_UPDATE") {
+        renderOverlay(data);
+      }
+    });
+  });
+}
+
+// ======================================================
+// 3. OBS WebSocket 連携処理
+// ======================================================
+const obs = new OBSWebSocket();
+
+function saveSettings() {
+  localStorage.setItem("obsHost_overlay", document.getElementById("obsHost").value);
+  localStorage.setItem("obsPort_overlay", document.getElementById("obsPort").value);
+  localStorage.setItem("obsPassword_overlay", document.getElementById("obsPassword").value);
+}
+
+function loadSettings() {
+  document.getElementById("obsHost").value = localStorage.getItem("obsHost_overlay") || "localhost";
+  document.getElementById("obsPort").value = localStorage.getItem("obsPort_overlay") || "4455";
+  document.getElementById("obsPassword").value = localStorage.getItem("obsPassword_overlay") || "";
+}
+
+async function initOBS() {
+  const host = document.getElementById("obsHost").value.trim() || "localhost";
+  const port = document.getElementById("obsPort").value.trim() || "4455";
+  const password = document.getElementById("obsPassword").value;
+  const statusText = document.getElementById("statusText");
+
+  saveSettings();
+
+  try {
+    statusText.style.color = "#facc15";
+    statusText.textContent = "接続中...";
+
+    obs.removeAllListeners("CustomEvent");
+    obs.on("CustomEvent", (data) => {
+      const eventData = data.eventData || data;
+      if (eventData && eventData.type === "MKADP_SOKUZI_UPDATE") {
+        renderOverlay(eventData);
+      }
+    });
+
+    await obs.connect(`ws://${host}:${port}`, password);
+    console.log("[overlay] OBS WebSocket 接続成功");
+    document.getElementById("configBox").style.display = "none";
+
+  } catch (e) {
+    console.error("[overlay] OBS 接続失敗:", e);
+    statusText.style.color = "#f87171";
+    statusText.textContent = "接続失敗: パスワードまたはポートを確認してください";
+  }
+}
+
+// ======================================================
+// 4. 即時集計（途中経過）描画処理
+// ======================================================
+function renderOverlay(data) {
+  const box = document.getElementById("overlayBox");
+  if (!data || !data.scores) return;
+
+  const currentRound = data.currentRound || 0;
+  const totalRounds = data.totalRounds || 12;
+  const myTeam = data.myTeam || "";
+
+  // 1. スコア順にソート (降順)
+  const sortedTeams = Object.entries(data.scores)
+    .map(([team, score]) => ({ team, score }))
+    .sort((a, b) => b.score - a.score);
+
+  if (sortedTeams.length === 0) return;
+
+  const topScore = sortedTeams[0].score;
+
+  // 2. チーム行のHTML生成
+  let teamsHtml = "";
+  sortedTeams.forEach((item, index) => {
+    const isMyTeam = (item.team === myTeam);
+    const rank = index + 1;
+    
+    // 1位との差分（または対抗戦の差分）
+    const diff = item.score - topScore;
+    let diffStr = "";
+    let diffClass = "diff-zero";
+
+    if (diff === 0) {
+      diffStr = "-";
+    } else {
+      diffStr = `${diff}`; // 例: -15
+      diffClass = "diff-minus";
     }
 
-    listEl.innerHTML = payload.ranking.map(item => `
-      <div class="row ${item.isMyTeam ? 'my-team' : ''}">
-        <span class="rank">${item.rank}位</span>
+    teamsHtml += `
+      <div class="team-row ${isMyTeam ? 'my-team' : ''}">
+        <span class="rank-badge">${rank}</span>
         <span class="team-name">${item.team}</span>
-        <span class="score">${item.score}点</span>
-        <span class="diff">${item.diff === 0 ? '-' : item.diff}</span>
+        <span class="score-val">${item.score}</span>
+        <span class="diff-val ${diffClass}">${diffStr}</span>
       </div>
-    `).join('');
-  }
+    `;
+  });
 
+  box.innerHTML = `
+    <div class="header">
+      <span>進行状況</span>
+      <span>${currentRound} / ${totalRounds} R</span>
+    </div>
+    <div class="team-list">
+      ${teamsHtml}
+    </div>
+  `;
+}
+
+// 初期化
+window.addEventListener("DOMContentLoaded", () => {
+  loadSettings();
   initOBS();
+});
 </script>
 </body>
 </html>
