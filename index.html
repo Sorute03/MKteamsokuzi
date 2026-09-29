@@ -1637,60 +1637,120 @@ async function sendInstantScore() {
 /* ============================================================
    OBS Custom Event (Payload) 送信処理
 ============================================================ */
+/* ============================================================
+   OBS WebSocket 接続 ＆ 送信関数
+============================================================ */
+
+/* ============================================================
+   送信側: オーバーレイデータ送信処理 (sendOverlay)
+============================================================ */
 
 const obs = new OBSWebSocket();
 
-async function connectOBS(verbose = false) {
-  const url = document.getElementById("obsUrlInput")?.value || "ws://localhost:4455";
-  const password = document.getElementById("obsPasswordInput")?.value || "";
-  const statusEl = document.getElementById("obsStatus");
+/**
+ * OBS WebSocket 接続関数
+ */
+async function connectOBS() {
+  const host = document.getElementById("obsHost")?.value || "localhost";
+  const port = document.getElementById("obsPort")?.value || "4455";
+  const password = document.getElementById("obsPassword")?.value || "";
 
   try {
     if (obs.socket && obs.socket.readyState === WebSocket.OPEN) {
       await obs.disconnect();
     }
-    await obs.connect(url, password);
-    if (statusEl) {
-      statusEl.textContent = "接続成功";
-      statusEl.style.color = "green";
-    }
-    if (verbose) alert("OBS WebSocket への接続に成功しました！");
+    await obs.connect(`ws://${host}:${port}`, password);
+    console.log("[送信側] OBS WebSocket 接続成功");
     return true;
-  } catch (error) {
-    console.error("OBS 接続エラー:", error);
-    if (statusEl) {
-      statusEl.textContent = "接続失敗";
-      statusEl.style.color = "red";
-    }
-    if (verbose) alert("OBS への接続に失敗しました: " + error.message);
+  } catch (e) {
+    console.error("[送信側] OBS WebSocket 接続失敗:", e);
     return false;
   }
 }
 
 /**
- * OBSブラウザソース向けに payload データを Broadcast 送信する関数
+ * 即時集計の途中経過をオーバーレイへ送信する関数
  */
-async function sendOBSPayload(payloadData) {
+async function sendOverlay() {
+  // 1. 各チームのスコア計算
+  const scores = calculateTeamScores(); // 既存の関数を活用
+
+  // 2. 現在進行中の最大ラウンド数を判定
+  let currentRound = 0;
+  for (let r = 0; r < totalRounds; r++) {
+    let hasData = false;
+    for (const team of state.teams) {
+      if (state.teamRanks[team] && state.teamRanks[team][r] && state.teamRanks[team][r].length > 0) {
+        hasData = true;
+        break;
+      }
+    }
+    if (hasData) {
+      currentRound = r + 1; // 1-indexed
+    }
+  }
+
+  // 3. 送信データの組み立て
+  const dataToSend = {
+    type: "MKADP_SOKUZI_UPDATE",
+    currentRound: currentRound,
+    totalRounds: typeof totalRounds !== "undefined" ? totalRounds : 12,
+    myTeam: state.myTeam || "自チーム",
+    scores: scores,              // 例: { "チーム1": 150, "チーム2": 120, ... }
+    penalty: state.penalty || {} // ペナルティ点数
+  };
+
+  // 4. 別ウィンドウ (window.open で開いた場合) へ送信
+  if (overlayWin && !overlayWin.closed) {
+    overlayWin.postMessage(dataToSend, "*");
+  }
+
+  // 5. PeerJS 経由で送信
+  if (typeof peerConn !== "undefined" && peerConn && peerConn.open) {
+    peerConn.send(dataToSend);
+  }
+
+  // 6. OBS WebSocket 経由で送信
   try {
+    if (!obs.socket || obs.socket.readyState !== WebSocket.OPEN) {
+      await connectOBS();
+    }
+
+    if (obs.socket && obs.socket.readyState === WebSocket.OPEN) {
+      await obs.call("BroadcastCustomEvent", {
+        vendorName: "mk-sokuzi",
+        eventData: dataToSend
+      });
+      console.log("[送信側] OBS 送信成功:", dataToSend);
+    }
+  } catch (e) {
+    console.error("[送信側] OBS 送信エラー:", e);
+  }
+}
+  
+async function sendOBSPayload(payload) {
+  try {
+    // 接続していない場合は接続を試みる
     if (!obs.socket || obs.socket.readyState !== WebSocket.OPEN) {
       const connected = await connectOBS(false);
       if (!connected) return;
     }
 
-    // OBSへカスタムイベントとして payload をブロードキャスト
+    // BroadcastCustomEvent を使用して送信
+    // eventData に payload を直接渡すことで、受信側の event.detail が payload になります
     await obs.call("BroadcastCustomEvent", {
-      vendorName: "mk-sokuzi", // イベントを識別する任意の名前
-      eventData: payloadData
+      vendorName: "mk-sokuzi",
+      eventData: payload
     });
 
-    console.log("OBS Payload 送信成功:", payloadData);
+    console.log("[送信側] OBS CustomEvent 送信完了:", payload);
   } catch (e) {
-    console.warn("OBS Payload 送信失敗:", e);
+    console.warn("[送信側] OBS CustomEvent 送信失敗:", e);
   }
 }
 
 /* ============================================================
-   即時集計送信（Webhook ＋ OBS Payload 対応版）
+   即時集計 ＆ 送信処理（元のコードそのまま）
 ============================================================ */
 
 async function sendInstantScoreMulti(silent = false) {
@@ -1755,7 +1815,6 @@ async function sendInstantScoreMulti(silent = false) {
 
   if (!silent) alert("途中経過（Payload）を送信しました");
 }
-
 /* ============================================================
    分析関連
 ============================================================ */
