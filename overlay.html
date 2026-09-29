@@ -1,127 +1,99 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
 <meta charset="UTF-8">
+<title>OBS Score Overlay</title>
+<script src="https://unpkg.com/obs-websocket-js"></script>
 <style>
-body {
-  margin: 0;
-  padding: 0;
-  background: transparent;
-  display: flex;
-  justify-content: center;
-  align-items: flex-end;
-  height: 100vh;
-  font-family: sans-serif;
-}
-
-#overlay {
-  background-color: rgba(0,0,0,0.55);
-  color: white;
-  padding: 12px 20px;
-  font-size: 24px;
-  border-radius: 8px;
-  display: flex;
-  gap: 20px;
-  justify-content: center;
-  align-items: center;
-}
-
-.team {
-  white-space: nowrap;
-}
+  body {
+    margin: 0;
+    padding: 20px;
+    background: transparent;
+    font-family: 'Segoe UI', sans-serif;
+    color: #fff;
+  }
+  .container {
+    width: 320px;
+    background: rgba(15, 23, 42, 0.85);
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255,255,255,0.1);
+  }
+  .title {
+    font-size: 14px;
+    font-weight: bold;
+    color: #94a3b8;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+  }
+  .row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+    background: rgba(255,255,255,0.05);
+    border-radius: 6px;
+  }
+  .row.my-team {
+    background: rgba(59, 130, 246, 0.3);
+    border: 1px solid rgba(59, 130, 246, 0.6);
+  }
+  .rank { font-weight: bold; width: 30px; }
+  .team-name { flex-grow: 1; }
+  .score { font-weight: bold; margin-right: 8px; }
+  .diff { font-size: 12px; color: #cbd5e1; }
 </style>
 </head>
 <body>
 
-<div id="overlay">待機中...</div>
+<div class="container">
+  <div class="title" id="overlayTitle">SCOREBOARD</div>
+  <div id="rankingList"></div>
+</div>
 
 <script>
-const params = new URLSearchParams(location.search);
-const USER = params.get("user") || "default";
-console.log("overlay USER:", USER);
+  const obs = new OBSWebSocket();
 
-// ▼ ユーザー別チャンネルを購読
-const bc = new BroadcastChannel("overlay_channel_" + USER);
+  async function initOBS() {
+    try {
+      // OBS内部のブラウザソースから接続するため localhost 指定
+      await obs.connect("ws://localhost:4455", "YOUR_OBS_PASSWORD");
+      console.log("OBS Overlay Connected");
 
-bc.onmessage = (event) => {
-  const data = event.data;
-  if (!data || data.type !== "overlay") return;
+      // 送信側からの CustomEvent (Payload) を待機
+      obs.on("CustomEvent", (data) => {
+        if (data.vendorName === "mk-sokuzi") {
+          renderOverlay(data.eventData);
+        }
+      });
 
-  // user チェックは不要（チャンネルが分かれているため）
-  renderOverlay(data.payload);
-};
-
-// ▼ iframe / window.open 用 postMessage も残す
-window.addEventListener("message", (event) => {
-  const data = event.data;
-  if (!data || data.type !== "overlay") return;
-  if (data.user !== USER) return;
-
-  renderOverlay(data.payload);
-});
-
-
-/* ---------------------------------------------------------
-   ① GAS から overlay データを取得（5秒ごと）
---------------------------------------------------------- */
-`async function fetchOverlayFromGAS() {
-  try {
-    const res = await fetch(GAS_URL + "?t=" + Date.now());
-    const data = await res.json();
-
-    if (data && data.type === "overlay") {
-      renderOverlay(data);
+    } catch (e) {
+      console.error("Overlay OBS Connection Failed:", e);
     }
-  } catch (err) {
-    console.warn("GAS 取得エラー:", err);
-  }
-}
-
-setInterval(fetchOverlayFromGAS, 5000);
-fetchOverlayFromGAS();`
-
-/* ---------------------------------------------------------
-   ② 親ページ（sokuzi.html）からの postMessage を受信
---------------------------------------------------------- */
-window.addEventListener("message", (event) => {
-  if (!event.data || event.data.type !== "overlay") return;
-
-  // ▼ ★ユーザー名フィルタ（追加）
-  if (event.data.user && event.data.user !== USER) return;
-
-  // event.data は { type:"overlay", user:"xxx", payload:{...} }
-  const payload = event.data.payload || event.data;
-
-  renderOverlay(payload);
-});
-
-/* ---------------------------------------------------------
-   ③ UI 更新（GAS / postMessage 共通）
---------------------------------------------------------- */
-function renderOverlay(data) {
-  if (!data.teams || !data.scores) {
-    document.getElementById("overlay").textContent = "データ待機中...";
-    return;
   }
 
-  const teams = data.teams.map(name => ({
-    name,
-    score: data.scores?.[name] ?? 0
-  }));
+  function renderOverlay(payload) {
+    const titleEl = document.getElementById("overlayTitle");
+    const listEl = document.getElementById("rankingList");
 
-  teams.sort((a, b) => b.score - a.score);
+    if (titleEl) {
+      titleEl.textContent = `自チーム: ${payload.myTeam}`;
+    }
 
-  let html = "<div style='display:flex; gap:20px;'>";
-  for (let i = 0; i < teams.length; i++) {
-    html += `<span class="team">${i+1}位 ${teams[i].name}：${teams[i].score}点</span>`;
+    listEl.innerHTML = payload.ranking.map(item => `
+      <div class="row ${item.isMyTeam ? 'my-team' : ''}">
+        <span class="rank">${item.rank}位</span>
+        <span class="team-name">${item.team}</span>
+        <span class="score">${item.score}点</span>
+        <span class="diff">${item.diff === 0 ? '-' : item.diff}</span>
+      </div>
+    `).join('');
   }
-  html += "</div>";
 
-  document.getElementById("overlay").innerHTML = html;
-}
-
-  
+  initOBS();
 </script>
-
 </body>
 </html>
