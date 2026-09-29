@@ -136,10 +136,10 @@
   }
 </style>
 
-<!-- PeerJS ライブラリ -->
+<!-- ★ PeerJS ライブラリ -->
 <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 
-<!-- OBS WebSocket ライブラリ -->
+<!-- ★ OBS WebSocket ライブラリ -->
 <script src="https://cdn.jsdelivr.net/npm/obs-websocket-js@5.0.3/dist/obs-ws.min.js"></script>
 </head>
 <body>
@@ -154,42 +154,63 @@
   <div id="statusText"></div>
 </div>
 
-<!-- 即時集計表示エリア -->
-<div id="overlayBox">
-  <div class="header">
-    <span>試合待機中</span>
-  </div>
-</div>
+<div id="overlayBox">待機中...</div>
 
 <script>
 // ======================================================
-// 1. window.postMessage 受信 (openOverlay用)
-// ======================================================
-window.addEventListener("message", (e) => {
-  if (e.data && e.data.type === "MKADP_SOKUZI_UPDATE") {
-    renderOverlay(e.data);
-  }
-});
-
-// ======================================================
-// 2. PeerJS 連携処理
+// 1. PeerJS 連携処理
 // ======================================================
 const params = new URLSearchParams(location.search);
 const USER = params.get("user");
 
+console.log("[overlay] USER =", USER);
+
 if (USER) {
+  console.log("[overlay] PeerJS を初期化します…");
   const peer = new Peer("overlay-" + USER);
+
+  peer.on("open", id => {
+    console.log("[overlay] PeerID open:", id);
+  });
+
+  peer.on("error", err => {
+    console.error("[overlay] PeerJS error:", err);
+  });
+
+  peer.on("disconnected", () => {
+    console.warn("[overlay] PeerJS disconnected");
+  });
+
+  peer.on("close", () => {
+    console.warn("[overlay] PeerJS connection closed");
+  });
+
   peer.on("connection", conn => {
-    conn.on("data", data => {
-      if (data && data.type === "MKADP_SOKUZI_UPDATE") {
-        renderOverlay(data);
-      }
+    console.log("[overlay] ADP と接続:", conn.peer);
+
+    conn.on("open", () => {
+      console.log("[overlay] conn.open: 接続成功");
+    });
+
+    conn.on("data", payload => {
+      console.log("[overlay] PeerJS 受信 payload:", payload);
+      renderOverlay(payload);
+    });
+
+    conn.on("error", err => {
+      console.error("[overlay] conn error:", err);
+    });
+
+    conn.on("close", () => {
+      console.warn("[overlay] conn closed");
     });
   });
+} else {
+  console.log("[overlay] ?user パラメータなし。PeerJS 連携はスキップします");
 }
 
 // ======================================================
-// 3. OBS WebSocket 連携処理
+// 2. OBS WebSocket 連携処理
 // ======================================================
 const obs = new OBSWebSocket();
 
@@ -200,9 +221,13 @@ function saveSettings() {
 }
 
 function loadSettings() {
-  document.getElementById("obsHost").value = localStorage.getItem("obsHost_overlay") || "localhost";
-  document.getElementById("obsPort").value = localStorage.getItem("obsPort_overlay") || "4455";
-  document.getElementById("obsPassword").value = localStorage.getItem("obsPassword_overlay") || "";
+  const host = localStorage.getItem("obsHost_overlay") || "localhost";
+  const port = localStorage.getItem("obsPort_overlay") || "4455";
+  const pass = localStorage.getItem("obsPassword_overlay") || "";
+
+  document.getElementById("obsHost").value = host;
+  document.getElementById("obsPort").value = port;
+  document.getElementById("obsPassword").value = pass;
 }
 
 async function initOBS() {
@@ -214,28 +239,32 @@ async function initOBS() {
   saveSettings();
 
   try {
+    console.log("[overlay] OBS WebSocket 接続試行...");
     statusText.style.color = "#facc15";
     statusText.textContent = "接続中...";
 
+    // イベント重複登録を防止
     obs.removeAllListeners("CustomEvent");
     obs.on("CustomEvent", (data) => {
+      console.log("[overlay] OBS イベント受信:", data);
+      
       const eventData = data.eventData || data;
-      if (eventData && eventData.type === "MKADP_SOKUZI_UPDATE") {
-        renderOverlay(eventData);
+      if (eventData && eventData.type === "MKADP_OVERLAY_UPDATE") {
+        renderOverlay(eventData.payload);
       }
     });
 
     await obs.connect(`ws://${host}:${port}`, password);
+
     console.log("[overlay] OBS WebSocket 接続成功");
     document.getElementById("configBox").style.display = "none";
 
   } catch (e) {
-    console.error("[overlay] OBS 接続失敗:", e);
+    console.error("[overlay] OBS WebSocket 接続失敗:", e);
     statusText.style.color = "#f87171";
-    statusText.textContent = "接続失敗: パスワードまたはポートを確認してください";
+    statusText.textContent = "接続失敗: パスワードを確認してください";
   }
 }
-
 // ======================================================
 // 4. 即時集計（途中経過）描画処理
 // ======================================================
