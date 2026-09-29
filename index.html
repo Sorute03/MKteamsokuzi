@@ -84,20 +84,29 @@ body.overlay-mode #tabs {
 
 </div>
  
-<div style="display:flex; flex-direction:column; gap:8px; max-width:400px;">
-  <hr style="margin-top:20px;">
-  <h3>OBS WebSocket 接続設定</h3>
-    <label>
-      URL:
-      <input id="obsUrlInput" value="ws://localhost:4455" style="width:100%;">
-    </label>
-    <label>
-      パスワード:
-      <input id="obsPasswordInput" type="password" placeholder="OBSで設定したパスワード" style="width:100%;">
-    </label>
-    <button onclick="connectOBS(true)">OBSへ接続確認</button>
-    <div id="obsStatus" style="font-size:12px; color:#666;">未接続</div>
-</div>
+<h3>オーバーレイ設定</h3>
+<div id="overlayFilterBox" style="margin:10px 0;">
+  <h3>OBS WebSocket接続</h3>
+  
+  <div>
+    <label>ホスト</label>
+    <input id="obsHost" value="localhost">
+  </div>
+  
+  <div>
+    <label>ポート</label>
+    <input id="obsPort" value="4455">
+  </div>
+  
+  <div>
+    <label>パスワード</label>
+    <input id="obsPassword" type="password">
+  </div>
+  
+  <div style="margin-top:10px;">
+    <button onclick="connectOBS()">接続</button>
+    <button onclick="disconnectOBS()">切断</button>
+  </div>
 
 </div>
 <!-- 入力タブ -->
@@ -1644,28 +1653,80 @@ async function sendInstantScore() {
 /* ============================================================
    送信側: オーバーレイデータ送信処理 (sendOverlay)
 ============================================================ */
+function saveOBSSettings() {
+  localStorage.setItem(
+    "obsSettings",
+    JSON.stringify({
+      host: document.getElementById("obsHost").value,
+      port: document.getElementById("obsPort").value,
+      password: document.getElementById("obsPassword").value
+    })
+  );
+}
+
+function loadOBSSettings() {
+  const raw =
+    localStorage.getItem("obsSettings");
+
+  if (!raw) return;
+
+  const s = JSON.parse(raw);
+
+  obsHost.value = s.host || "localhost";
+  obsPort.value = s.port || "4455";
+  obsPassword.value = s.password || "";
+}
+
 
 const obs = new OBSWebSocket();
 
-/**
- * OBS WebSocket 接続関数
- */
 async function connectOBS() {
-  const host = document.getElementById("obsHost")?.value || "localhost";
-  const port = document.getElementById("obsPort")?.value || "4455";
-  const password = document.getElementById("obsPassword")?.value || "";
 
   try {
-    if (obs.socket && obs.socket.readyState === WebSocket.OPEN) {
-      await obs.disconnect();
-    }
-    await obs.connect(`ws://${host}:${port}`, password);
-    console.log("[送信側] OBS WebSocket 接続成功");
-    return true;
-  } catch (e) {
-    console.error("[送信側] OBS WebSocket 接続失敗:", e);
-    return false;
+
+    const host =
+      document.getElementById("obsHost").value;
+
+    const port =
+      document.getElementById("obsPort").value;
+
+    const password =
+      document.getElementById("obsPassword").value;
+
+    await obs.connect(
+      `ws://${host}:${port}`,
+      password
+    );
+
+    document.getElementById(
+      "obsStatus"
+    ).textContent = "接続成功";
+
+    saveOBSSettings();
+
+  } catch(e) {
+
+    document.getElementById(
+      "obsStatus"
+    ).textContent = "接続失敗";
+
+    console.error(e);
+
   }
+}
+
+async function disconnectOBS() {
+
+  try {
+
+    await obs.disconnect();
+
+    obsStatus.textContent = "切断";
+
+  } catch(e) {
+    console.error(e);
+  }
+
 }
 
 /**
