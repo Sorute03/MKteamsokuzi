@@ -83,7 +83,27 @@ body.overlay-mode #tabs {
   </iframe>
 
 </div>
+ 
+<div style="display:flex; flex-direction:column; gap:8px; max-width:400px;">
+  <hr style="margin-top:20px;">
+  <h3>OBS WebSocket 接続設定</h3>
+    <label>
+      URL:
+      <input id="obsUrlInput" value="ws://localhost:4455" style="width:100%;">
+    </label>
+    <label>
+      パスワード:
+      <input id="obsPasswordInput" type="password" placeholder="OBSで設定したパスワード" style="width:100%;">
+    </label>
+    <label>
+      テキストソース名:
+      <input id="obsSourceNameInput" value="MK_Score_Overlay" style="width:100%;">
+    </label>
+    <button onclick="connectOBS(true)">OBSへ接続確認</button>
+    <div id="obsStatus" style="font-size:12px; color:#666;">未接続</div>
+</div>
 
+</div>
 <!-- 入力タブ -->
 <div id="inputTab" class="tabContent" style="display:block;">
   <br>
@@ -339,8 +359,10 @@ const courseList = [
   "DKスノーマウンテン",
   "ロゼッタてんもんだい",
   "アイスビルディング",
+  "バニラレイク",
   "ワリオシップ",
   "ノコノコビーチ",
+  "SFCノコノコビーチ",
   "リバーサイドサファリ",
   "ピーチスタジアム",
   "ピーチビーチ",
@@ -350,14 +372,23 @@ const courseList = [
   "プクプクフォールズ",
   "ショーニューロード",
   "おばけシネマ",
+  "おばけぬま1",
+  "おばけぬま2",
+  "おばけぬま3",	
   "ホネホネツイスター",
   "モーモーカントリー",
   "チョコマウンテン",
+  "チョコレーとう1",
+  "チョコレーとう2",
   "キノピオファクトリー",
   "クッパキャッスル",
   "どんぐりツリーハウス",
   "マリオサーキット",
+　"SFCマリオサーキット1",
+  "SFCマリオサーキット2",
+  "SFCマリオサーキット3",
   "レインボーロード",
+
 
   // ここから遷移データ
   "マリオブラザーズサーキット→トロフィーシティ",
