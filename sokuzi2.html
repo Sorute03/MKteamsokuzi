@@ -2,11 +2,12 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>MK Rank Input</title>
-
+<title>MKteamsokuzi</title>
+<script src="https://unpkg.com/obs-websocket-js"></script>
 <style>
 body { margin:0; padding:10px; font-family:sans-serif; }
 /* 通常は上にある */
+/* 通常は上に固定 */
 #tabs {
   position: fixed;
   top: 0;
@@ -14,14 +15,15 @@ body { margin:0; padding:10px; font-family:sans-serif; }
   width: 100%;
   background: rgba(0,0,0,0.6);
   padding: 6px;
-  z-index: 9999;
+  z-index: 10;
 }
 
-/* Overlay タブのときだけ下に移動 */
 body.overlay-mode #tabs {
-  position: static;
-  width: 100%;
-  margin-top: 2000px; /* 必要なら余白 */
+  position: static !important; /* ← 完全に固定解除 */
+  top: auto !important;        /* ← 上固定を無効化 */
+  left: auto !important;
+  bottom: auto !important;
+  margin-top: 0px;            /* 必要なら調整 */
 }
 
 .tabBtn { padding:6px 12px; border:1px solid #ccc; background:#f5f5f5; cursor:pointer; }
@@ -59,14 +61,13 @@ body.overlay-mode #tabs {
   <button class="tabBtn" data-tab="p2pTab">P2P</button>
   <button class="tabBtn" data-tab="resultTab">リザルト</button>
   <button class="tabBtn" data-tab="webhookTab">Webhook</button>
-  <button class="tabBtn" data-tab="overlayTab">Overlay</button>
 </div>
-  
-<button onclick="openOverlayWindow()">オーバーレイを開く</button>
-<div id="overlayTab" class="tabContent" style="display:none; position:relative; height:600px;">
+
+
+<div id="overlayTab" class="tabContent" style="display:none; position:relative; height:600px; background: transparent;">
 
   <iframe id="overlayFrame"
-          src="https://sorute03.github.io/MKteamsokuzi/overlay.html"
+          src=""
           style="
             position:absolute;
             top:50%;
@@ -81,9 +82,38 @@ body.overlay-mode #tabs {
   </iframe>
 
 </div>
+ 
+<h3>オーバーレイ設定</h3>
+<div id="overlayFilterBox" style="margin:10px 0;">
+  <h3>OBS WebSocket接続</h3>
+  
+  <div>
+    <label>ホスト</label>
+    <input id="obsHost" value="localhost">
+  </div>
+  
+  <div>
+    <label>ポート</label>
+    <input id="obsPort" value="4455">
+  </div>
+  
+  <div>
+    <label>パスワード</label>
+    <input id="obsPassword" type="password">
+  </div>
+  
+  <div style="margin-top:10px;">
+    <button onclick="connectOBS()">接続</button>
+    <button onclick="disconnectOBS()">切断</button>
+  </div>
 
+</div>
 <!-- 入力タブ -->
 <div id="inputTab" class="tabContent" style="display:block;">
+  <br>
+  <br>
+  <input id="overlayUser" placeholder="ユーザー名を入力">
+  <button onclick="openOverlay()">オーバーレイを開く</button>
 
   <h3>モード設定</h3>
   <div>
@@ -275,12 +305,26 @@ body.overlay-mode #tabs {
   <h3>背景画像</h3>
   <input type="file" id="bgImageInput" accept="image/*" onchange="loadBackgroundImage(this.files[0])">
   <div style="font-size:12px;color:#666;">未設定の場合はデフォルト背景を使用</div>
+  
+  <h3>文字色設定</h3>
+  <input type="color" id="resultTextColorInput" value="#ffffff" onchange="setResultTextColor(this.value)">
+  <div style="font-size:12px; color:#666;">リザルト画像内の文字色を変更できます</div>
+
+  <h3>影（text-shadow）</h3>
+  <label><input type="checkbox" id="resultTextShadowInput" onchange="setResultTextShadow(this.checked)"> 影を付ける</label>
+
+  <h3>縁取り（strokeText）</h3>
+  <label><input type="checkbox" id="resultStrokeInput" onchange="setResultStroke(this.checked)"> 縁取りを付ける</label>
+
+  <h3>背景の明るさ</h3>
+  <input type="range" id="resultBgBrightnessInput" min="0.5" max="1.5" step="0.01" value="1" onchange="setResultBgBrightness(this.value)">
+  <div style="font-size:12px;color:#666;">1.0 = 元の明るさ</div>
 
 
   <h3>リザルト画像</h3>
   <button onclick="generateResultImage()">リザルト画像を生成</button>
 
-  <canvas id="resultCanvas" width="800" height="1200" style="display:none;"></canvas>
+  <canvas id="resultCanvas" width="2500" height="1200" style="display:none;"></canvas>
 
 </div>
 
@@ -297,10 +341,3 @@ body.overlay-mode #tabs {
 <button onclick="sendInstantScoreMulti(false)">途中経過を送信</button>
 
 <div id="aggregateArea" style="margin-top:20px;"></div>
-
-
-<script src="main.js"></script>
-
-</body>
-</html>
-
