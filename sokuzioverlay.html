@@ -248,10 +248,8 @@ async function initOBS() {
     obs.on("CustomEvent", (data) => {
       console.log("[overlay] OBS イベント受信:", data);
       
-      const eventData = data.eventData || data;
-      if (eventData && eventData.type === "MKADP_OVERLAY_UPDATE") {
-        renderOverlay(eventData.payload);
-      }
+      const rawData = data.eventData || data;
+      renderOverlay(rawData);
     });
 
     await obs.connect(`ws://${host}:${port}`, password);
@@ -265,63 +263,121 @@ async function initOBS() {
     statusText.textContent = "接続失敗: パスワードを確認してください";
   }
 }
+
 // ======================================================
-// 4. 即時集計（途中経過）描画処理
+// 3. 即時集計（途中経過）描画処理（順位ソート追加）
 // ======================================================
 function renderOverlay(data) {
+  console.log("[overlay] renderOverlay 実行:", data);
+
   const box = document.getElementById("overlayBox");
-  if (!data || !data.scores) return;
+  if (!data) return;
 
-  const currentRound = data.currentRound || 0;
-  const totalRounds = data.totalRounds || 12;
-  const myTeam = data.myTeam || "";
+  // データ階層の吸収 (data.payload があればそちらを優先)
+  const payload = data.payload || data;
 
-  // 1. スコア順にソート (降順)
-  const sortedTeams = Object.entries(data.scores)
-    .map(([team, score]) => ({ team, score }))
-    .sort((a, b) => b.score - a.score);
+  // ----------------------------------------------------
+  // パターン A: 送信データが `ranking` 配列形式の場合
+  // ----------------------------------------------------
+  if (payload.ranking && Array.isArray(payload.ranking)) {
+    // 1位から順番に並ぶよう、rank昇順（またスコア降順）でソート
+    const sortedRanking = [...payload.ranking].sort((a, b) => {
+      if (a.rank !== undefined && b.rank !== undefined) {
+        return a.rank - b.rank; // 1位 -> 2位 -> 3位 ...
+      }
+      return (b.score || 0) - (a.score || 0); // rank が無い場合はスコアの高い順
+    });
 
-  if (sortedTeams.length === 0) return;
+    let teamsHtml = "";
 
-  const topScore = sortedTeams[0].score;
+    sortedRanking.forEach(item => {
+      const isMyTeam = item.isMyTeam || (payload.myTeam && item.team === payload.myTeam);
+      
+      let diffStr = "-";
+      let diffClass = "diff-zero";
 
-  // 2. チーム行のHTML生成
-  let teamsHtml = "";
-  sortedTeams.forEach((item, index) => {
-    const isMyTeam = (item.team === myTeam);
-    const rank = index + 1;
-    
-    // 1位との差分（または対抗戦の差分）
-    const diff = item.score - topScore;
-    let diffStr = "";
-    let diffClass = "diff-zero";
+      if (typeof item.diff === "number") {
+        if (item.diff < 0) {
+          diffStr = `${item.diff}`;
+          diffClass = "diff-minus";
+        } else if (item.diff > 0) {
+          diffStr = `+${item.diff}`;
+          diffClass = "diff-plus";
+        }
+      }
 
-    if (diff === 0) {
-      diffStr = "-";
-    } else {
-      diffStr = `${diff}`; // 例: -15
-      diffClass = "diff-minus";
-    }
+      teamsHtml += `
+        <div class="team-row ${isMyTeam ? 'my-team' : ''}">
+          <span class="rank-badge">${item.rank ?? ''}</span>
+          <span class="team-name">${item.team ?? ''}</span>
+          <span class="score-val">${item.score ?? 0}</span>
+          <span class="diff-val ${diffClass}">${diffStr}</span>
+        </div>
+      `;
+    });
 
-    teamsHtml += `
-      <div class="team-row ${isMyTeam ? 'my-team' : ''}">
-        <span class="rank-badge">${rank}</span>
-        <span class="team-name">${item.team}</span>
-        <span class="score-val">${item.score}</span>
-        <span class="diff-val ${diffClass}">${diffStr}</span>
+    box.innerHTML = `
+      <div class="header">
+        <span>試合経過</span>
+      </div>
+      <div class="team-list">
+        ${teamsHtml}
       </div>
     `;
-  });
+    return;
+  }
 
-  box.innerHTML = `
-    <div class="header">
-      <span>進行状況</span>
-      <span>${currentRound} / ${totalRounds} R</span>
-    </div>
-    <div class="team-list">
-      ${teamsHtml}
-    </div>
-  `;
+  // ----------------------------------------------------
+  // パターン B: 送信データが `scores` オブジェクト形式の場合
+  // ----------------------------------------------------
+  if (payload.scores) {
+    const currentRound = payload.currentRound || 0;
+    const totalRounds = payload.totalRounds || 12;
+    const myTeam = payload.myTeam || "";
+
+    // スコアが高い順（1位から順番）にソート
+    const sortedTeams = Object.entries(payload.scores)
+      .map(([team, score]) => ({ team, score }))
+      .sort((a, b) => b.score - a.score);
+
+    if (sortedTeams.length === 0) return;
+
+    const topScore = sortedTeams[0].score;
+    let teamsHtml = "";
+
+    sortedTeams.forEach((item, index) => {
+      const isMyTeam = (item.team === myTeam);
+      const rank = index + 1;
+      
+      const diff = item.score - topScore;
+      let diffStr = "-";
+      let diffClass = "diff-zero";
+
+      if (diff < 0) {
+        diffStr = `${diff}`;
+        diffClass = "diff-minus";
+      }
+
+      teamsHtml += `
+        <div class="team-row ${isMyTeam ? 'my-team' : ''}">
+          <span class="rank-badge">${rank}</span>
+          <span class="team-name">${item.team}</span>
+          <span class="score-val">${item.score}</span>
+          <span class="diff-val ${diffClass}">${diffStr}</span>
+        </div>
+      `;
+    });
+
+    box.innerHTML = `
+      <div class="header">
+        <span>進行状況</span>
+        <span>${currentRound} / ${totalRounds} R</span>
+      </div>
+      <div class="team-list">
+        ${teamsHtml}
+      </div>
+    `;
+  }
 }
 
 // 初期化
