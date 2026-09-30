@@ -1,7 +1,11 @@
-/* ============================================================
+
+  /* ============================================================
    基本設定・状態
 ============================================================ */
+// ★ 最重要：state の初期化（これが無いと全部 undefined になる）
 
+
+  
 const totalRounds = 12;
 const courseList = [
   "マリオブラザーズサーキット",
@@ -15,8 +19,10 @@ const courseList = [
   "DKスノーマウンテン",
   "ロゼッタてんもんだい",
   "アイスビルディング",
+  "バニラレイク",
   "ワリオシップ",
   "ノコノコビーチ",
+  "SFCノコノコビーチ",
   "リバーサイドサファリ",
   "ピーチスタジアム",
   "ピーチビーチ",
@@ -26,229 +32,257 @@ const courseList = [
   "プクプクフォールズ",
   "ショーニューロード",
   "おばけシネマ",
+  "おばけぬま1",
+  "おばけぬま2",
+  "おばけぬま3",	
   "ホネホネツイスター",
   "モーモーカントリー",
   "チョコマウンテン",
+  "チョコレーとう1",
+  "チョコレーとう2",
   "キノピオファクトリー",
   "クッパキャッスル",
   "どんぐりツリーハウス",
   "マリオサーキット",
+　"SFCマリオサーキット1",
+  "SFCマリオサーキット2",
+  "SFCマリオサーキット3",
   "レインボーロード",
-     
-  "DKうちゅうセンター→マリオブラザーズサーキット",
-  "キノピオファクトリー→マリオブラザーズサーキット",
-  "サンサンさばく→マリオブラザーズサーキット",
-  "シュポポコースター→マリオブラザーズサーキット",
-  "チョコマウンテン→マリオブラザーズサーキット",
-  "トロフィーシティ→マリオブラザーズサーキット",
-  "ヘイホーカーニバル→マリオブラザーズサーキット",
-  "ワリオスタジアム→マリオブラザーズサーキット",
 
+
+  // ここから遷移データ
   "マリオブラザーズサーキット→トロフィーシティ",
-  "シュポポコースター→トロフィーシティ",
-  "DKうちゅうセンター→トロフィーシティ",
-  "サンサンさばく→トロフィーシティ",
-  "ワリオスタジアム→トロフィーシティ",
-  "ノコノコビーチ→トロフィーシティ",
-  "リバーサイドサファリ→トロフィーシティ",
-  "モーモーカントリー→トロフィーシティ",
-  "ピーチスタジアム→トロフィーシティ",
-
   "マリオブラザーズサーキット→シュポポコースター",
-  "トロフィーシティ→シュポポコースター",
-  "DKうちゅうセンター→シュポポコースター",
-  "サンサンさばく→シュポポコースター",
-  "チョコマウンテン→シュポポコースター",
-
   "マリオブラザーズサーキット→サンサンさばく",
-  "トロフィーシティ→サンサンさばく",
-  "シュポポコースター→サンサンさばく",
-  "DKうちゅうセンター→サンサンさばく",
-  "ヘイホーカーニバル→サンサンさばく",
-
   "マリオブラザーズサーキット→ヘイホーカーニバル",
-  "サンサンさばく→ヘイホーカーニバル",
-  "ワリオスタジアム→ヘイホーカーニバル",
-  "キラーシップ→ヘイホーカーニバル",
-  "チョコマウンテン→ヘイホーカーニバル",
-
   "マリオブラザーズサーキット→ワリオスタジアム",
-  "トロフィーシティ→ワリオスタジアム",
-  "ヘイホーカーニバル→ワリオスタジアム",
-  "キラーシップ→ワリオスタジアム",
-  "チョコマウンテン→ワリオスタジアム",
-  "キノピオファクトリー→ワリオスタジアム",
-  "クッパキャッスル→ワリオスタジアム",
+  "マリオブラザーズサーキット→チョコマウンテン",
+  "マリオブラザーズサーキット→キノピオファクトリー",
 
+  "トロフィーシティ→マリオブラザーズサーキット",
+  "トロフィーシティ→シュポポコースター",
+  "トロフィーシティ→DKうちゅうセンター",
+  "トロフィーシティ→サンサンさばく",
+  "トロフィーシティ→ワリオスタジアム",
+  "トロフィーシティ→ノコノコビーチ",
+  "トロフィーシティ→リバーサイドサファリ",
+  "トロフィーシティ→モーモーカントリー",
+  "トロフィーシティ→チョコマウンテン",
+  "トロフィーシティ→ピーチスタジアム",
+
+  "シュポポコースター→マリオブラザーズサーキット",
+  "シュポポコースター→トロフィーシティ",
+  "シュポポコースター→DKうちゅうセンター",
+  "シュポポコースター→サンサンさばく",
+  "シュポポコースター→ノコノコビーチ",
+  "シュポポコースター→チョコマウンテン",
+
+  "DKうちゅうセンター→マリオブラザーズサーキット",
+  "DKうちゅうセンター→トロフィーシティ",
+  "DKうちゅうセンター→シュポポコースター",
+  "DKうちゅうセンター→サンサンさばく",
+  "DKうちゅうセンター→ノコノコビーチ",
+  "DKうちゅうセンター→ピーチスタジアム",
+
+  "サンサンさばく→マリオブラザーズサーキット",
+  "サンサンさばく→トロフィーシティ",
+  "サンサンさばく→シュポポコースター",
+  "サンサンさばく→ヘイホーカーニバル",
+  "サンサンさばく→ノコノコビーチ",
+
+  "ヘイホーカーニバル→マリオブラザーズサーキット",
+  "ヘイホーカーニバル→サンサンさばく",
+  "ヘイホーカーニバル→ワリオスタジアム",
   "ヘイホーカーニバル→キラーシップ",
+  "ヘイホーカーニバル→チョコマウンテン",
+
+  "ワリオスタジアム→マリオブラザーズサーキット",
+  "ワリオスタジアム→トロフィーシティ",
+  "ワリオスタジアム→ヘイホーカーニバル",
   "ワリオスタジアム→キラーシップ",
-  "キノピオファクトリー→キラーシップ",
-  "クッパキャッスル→キラーシップ",
-  "ホネホネツイスター→キラーシップ",
+  "ワリオスタジアム→ホネホネツイスター",
+  "ワリオスタジアム→チョコマウンテン",
+  "ワリオスタジアム→キノピオファクトリー",
+  "ワリオスタジアム→クッパキャッスル",
+
+  "キラーシップ→ヘイホーカーニバル",
+  "キラーシップ→ワリオスタジアム",
+  "キラーシップ→ホネホネツイスター",
+  "キラーシップ→キノピオファクトリー",
+  "キラーシップ→クッパキャッスル",
 
   "DKスノーマウンテン→ロゼッタてんもんだい",
-  "アイスビルディング→ロゼッタてんもんだい",
-  "ワリオシップ→ロゼッタてんもんだい",
-  "プクプクフォールズ→ロゼッタてんもんだい",
-  "ショーニューロード→ロゼッタてんもんだい",
-  "おばけシネマ→ロゼッタてんもんだい",
-  "マリオサーキット→ロゼッタてんもんだい",
-
   "DKスノーマウンテン→アイスビルディング",
-  "ロゼッタてんもんだい→アイスビルディング",
-  "ワリオシップ→アイスビルディング",
-  "ショーニューロード→アイスビルディング",
-
   "DKスノーマウンテン→ワリオシップ",
-  "ロゼッタてんもんだい→ワリオシップ",
-  "アイスビルディング→ワリオシップ",
-  "ピーチビーチ→ワリオシップ",
-  "ソルティータウン→ワリオシップ",
-  "プクプクフォールズ→ワリオシップ",
-
-  "トロフィーシティ→ノコノコビーチ",
-  "DKうちゅうセンター→ノコノコビーチ",
-  "サンサンさばく→ノコノコビーチ",
-  "シュポポコースター→ノコノコビーチ",
-  "ディノディノジャングル→ノコノコビーチ",
-  "ハテナしんでん→ノコノコビーチ",
-  "ピーチスタジアム→ノコノコビーチ",
-  "リバーサイドサファリ→ノコノコビーチ",
-
-  "トロフィーシティ→リバーサイドサファリ",
-  "ノコノコビーチ→リバーサイドサファリ",
-  "ピーチビーチ→リバーサイドサファリ",
-  "ソルティータウン→リバーサイドサファリ",
-  "ディノディノジャングル→リバーサイドサファリ",
-  "ハテナしんでん→リバーサイドサファリ",
-  "プクプクフォールズ→リバーサイドサファリ",
-  "ピーチスタジアム→リバーサイドサファリ",
-
-  "ワリオシップ→ピーチビーチ",
-  "リバーサイドサファリ→ピーチビーチ",
-  "ソルティータウン→ピーチビーチ",
-  "ディノディノジャングル→ピーチビーチ",
-  "ハテナしんでん→ピーチビーチ",
-
   "DKスノーマウンテン→ソルティータウン",
+  "DKスノーマウンテン→プクプクフォールズ",
+  "DKスノーマウンテン→ショーニューロード",
+  "DKスノーマウンテン→モーモーカントリー",
+
+  "ロゼッタてんもんだい→DKスノーマウンテン",
+  "ロゼッタてんもんだい→アイスビルディング",
+  "ロゼッタてんもんだい→ワリオシップ",
+  "ロゼッタてんもんだい→プクプクフォールズ",
+  "ロゼッタてんもんだい→ショーニューロード",
+  "ロゼッタてんもんだい→おばけシネマ",
+  "ロゼッタてんもんだい→マリオサーキット",
+
+  "アイスビルディング→DKスノーマウンテン",
+  "アイスビルディング→ロゼッタてんもんだい",
+  "アイスビルディング→ワリオシップ",
   "アイスビルディング→ソルティータウン",
+  "アイスビルディング→プクプクフォールズ",
+  "アイスビルディング→ショーニューロード",
+
+  "ワリオシップ→DKスノーマウンテン",
+  "ワリオシップ→ロゼッタてんもんだい",
+  "ワリオシップ→アイスビルディング",
+  "ワリオシップ→ピーチビーチ",
   "ワリオシップ→ソルティータウン",
-  "ピーチビーチ→ソルティータウン",
-  "プクプクフォールズ→ソルティータウン",
-  "リバーサイドサファリ→ソルティータウン",
-  "ディノディノジャングル→ソルティータウン",
-  "ハテナしんでん→ソルティータウン",
+  "ワリオシップ→プクプクフォールズ",
 
+  "ノコノコビーチ→トロフィーシティ",
+  "ノコノコビーチ→DKうちゅうセンター",
+  "ノコノコビーチ→リバーサイドサファリ",
   "ノコノコビーチ→ディノディノジャングル",
-  "リバーサイドサファリ→ディノディノジャングル",
-  "ピーチビーチ→ディノディノジャングル",
-  "ソルティータウン→ディノディノジャングル",
-  "ハテナしんでん→ディノディノジャングル",
+  "ノコノコビーチ→ピーチスタジアム",
 
+  "リバーサイドサファリ→トロフィーシティ",
+  "リバーサイドサファリ→ノコノコビーチ",
+  "リバーサイドサファリ→ピーチビーチ",
+  "リバーサイドサファリ→ソルティータウン",
+  "リバーサイドサファリ→ディノディノジャングル",
   "リバーサイドサファリ→ハテナしんでん",
+  "リバーサイドサファリ→プクプクフォールズ",
+  "リバーサイドサファリ→ピーチスタジアム",
+
+  "ピーチビーチ→ワリオシップ",
+  "ピーチビーチ→リバーサイドサファリ",
+  "ピーチビーチ→ソルティータウン",
+  "ピーチビーチ→ディノディノジャングル",
   "ピーチビーチ→ハテナしんでん",
+
+  "ソルティータウン→DKスノーマウンテン",
+  "ソルティータウン→ワリオシップ",
+  "ソルティータウン→リバーサイドサファリ",
+  "ソルティータウン→ピーチビーチ",
+  "ソルティータウン→ディノディノジャングル",
   "ソルティータウン→ハテナしんでん",
+  "ソルティータウン→プクプクフォールズ",
+
+  "ディノディノジャングル→ノコノコビーチ",
+  "ディノディノジャングル→リバーサイドサファリ",
+  "ディノディノジャングル→ピーチビーチ",
+  "ディノディノジャングル→ソルティータウン",
   "ディノディノジャングル→ハテナしんでん",
 
-  "DKスノーマウンテン→プクプクフォールズ",
-  "ロゼッタてんもんだい→プクプクフォールズ",
-  "ワリオシップ→プクプクフォールズ",
-  "リバーサイドサファリ→プクプクフォールズ",
-  "ソルティータウン→プクプクフォールズ",
-  "ショーニューロード→プクプクフォールズ",
-  "モーモーカントリー→プクプクフォールズ",
-  "チョコマウンテン→プクプクフォールズ",
-  "ピーチスタジアム→プクプクフォールズ",
+  "ハテナしんでん→ノコノコビーチ",
+  "ハテナしんでん→リバーサイドサファリ",
+  "ハテナしんでん→ピーチビーチ",
+  "ハテナしんでん→ソルティータウン",
+  "ハテナしんでん→ディノディノジャングル",
 
-  "DKスノーマウンテン→ショーニューロード",
-  "ロゼッタてんもんだい→ショーニューロード",
-  "アイスビルディング→ショーニューロード",
+  "プクプクフォールズ→DKスノーマウンテン",
+  "プクプクフォールズ→ロゼッタてんもんだい",
+  "プクプクフォールズ→ワリオシップ",
+  "プクプクフォールズ→リバーサイドサファリ",
+  "プクプクフォールズ→ソルティータウン",
   "プクプクフォールズ→ショーニューロード",
-  "おばけシネマ→ショーニューロード",
-  "モーモーカントリー→ショーニューロード",
-  "キノピオファクトリー→ショーニューロード",
-  "どんぐりツリーハウス→ショーニューロード",
-  "マリオサーキット→ショーニューロード",
-
-  "ロゼッタてんもんだい→おばけシネマ",
-  "ショーニューロード→おばけシネマ",
-  "ホネホネツイスター→おばけシネマ",
-  "どんぐりツリーハウス→おばけシネマ",
-  "マリオサーキット→おばけシネマ",
-
-  "ワリオスタジアム→ホネホネツイスター",
-  "キラーシップ→ホネホネツイスター",
-  "おばけシネマ→ホネホネツイスター",
-  "モーモーカントリー→ホネホネツイスター",
-  "キノピオファクトリー→ホネホネツイスター",
-  "クッパキャッスル→ホネホネツイスター",
-  "どんぐりツリーハウス→ホネホネツイスター",
-  "マリオサーキット→ホネホネツイスター",
-
-  "DKスノーマウンテン→モーモーカントリー",
-  "ショーニューロード→モーモーカントリー",
   "プクプクフォールズ→モーモーカントリー",
-  "ホネホネツイスター→モーモーカントリー",
-  "チョコマウンテン→モーモーカントリー",
-  "キノピオファクトリー→モーモーカントリー",
-  "マリオサーキット→モーモーカントリー",
-  "ピーチスタジアム→モーモーカントリー",
-
-  "マリオブラザーズサーキット→チョコマウンテン",
-  "トロフィーシティ→チョコマウンテン",
-  "シュポポコースター→チョコマウンテン",
-  "ヘイホーカーニバル→チョコマウンテン",
-  "ワリオスタジアム→チョコマウンテン",
   "プクプクフォールズ→チョコマウンテン",
-  "モーモーカントリー→チョコマウンテン",
-  "キノピオファクトリー→チョコマウンテン",
-  "クッパキャッスル→チョコマウンテン",
+  "プクプクフォールズ→ピーチスタジアム",
 
-  "マリオブラザーズサーキット→キノピオファクトリー",
-  "ワリオスタジアム→キノピオファクトリー",
-  "キラーシップ→キノピオファクトリー",
+  "ショーニューロード→DKスノーマウンテン",
+  "ショーニューロード→ロゼッタてんもんだい",
+  "ショーニューロード→アイスビルディング",
+  "ショーニューロード→プクプクフォールズ",
+  "ショーニューロード→おばけシネマ",
+  "ショーニューロード→モーモーカントリー",
   "ショーニューロード→キノピオファクトリー",
-  "ホネホネツイスター→キノピオファクトリー",
-  "モーモーカントリー→キノピオファクトリー",
-  "チョコマウンテン→キノピオファクトリー",
-  "クッパキャッスル→キノピオファクトリー",
-  "どんぐりツリーハウス→キノピオファクトリー",
-  "マリオサーキット→キノピオファクトリー",
-  "ピーチスタジアム→キノピオファクトリー",
-
-  "ワリオスタジアム→クッパキャッスル",
-  "キラーシップ→クッパキャッスル",
-  "ホネホネツイスター→クッパキャッスル",
-  "チョコマウンテン→クッパキャッスル",
-  "キノピオファクトリー→クッパキャッスル",
-  "マリオサーキット→クッパキャッスル",
-
   "ショーニューロード→どんぐりツリーハウス",
-  "おばけシネマ→どんぐりツリーハウス",
-  "ホネホネツイスター→どんぐりツリーハウス",
-  "キノピオファクトリー→どんぐりツリーハウス",
-  "マリオサーキット→どんぐりツリーハウス",
-
-  "ロゼッタてんもんだい→マリオサーキット",
   "ショーニューロード→マリオサーキット",
+
+  "おばけシネマ→ロゼッタてんもんだい",
+  "おばけシネマ→ショーニューロード",
+  "おばけシネマ→ホネホネツイスター",
+  "おばけシネマ→どんぐりツリーハウス",
   "おばけシネマ→マリオサーキット",
+
+  "ホネホネツイスター→ワリオスタジアム",
+  "ホネホネツイスター→キラーシップ",
+  "ホネホネツイスター→おばけシネマ",
+  "ホネホネツイスター→モーモーカントリー",
+  "ホネホネツイスター→キノピオファクトリー",
+  "ホネホネツイスター→クッパキャッスル",
+  "ホネホネツイスター→どんぐりツリーハウス",
   "ホネホネツイスター→マリオサーキット",
+
+  "モーモーカントリー→トロフィーシティ",
+  "モーモーカントリー→DKスノーマウンテン",
+  "モーモーカントリー→プクプクフォールズ",
+  "モーモーカントリー→ショーニューロード",
+  "モーモーカントリー→ホネホネツイスター",
+  "モーモーカントリー→チョコマウンテン",
+  "モーモーカントリー→キノピオファクトリー",
   "モーモーカントリー→マリオサーキット",
+  "モーモーカントリー→ピーチスタジアム",
+
+  "チョコマウンテン→マリオブラザーズサーキット",
+  "チョコマウンテン→トロフィーシティ",
+  "チョコマウンテン→シュポポコースター",
+  "チョコマウンテン→ヘイホーカーニバル",
+  "チョコマウンテン→ワリオスタジアム",
+  "チョコマウンテン→プクプクフォールズ",
+  "チョコマウンテン→モーモーカントリー",
+  "チョコマウンテン→キノピオファクトリー",
+  "チョコマウンテン→クッパキャッスル",
+  "チョコマウンテン→ピーチスタジアム",
+
+  "キノピオファクトリー→マリオブラザーズサーキット",
+  "キノピオファクトリー→ワリオスタジアム",
+  "キノピオファクトリー→キラーシップ",
+  "キノピオファクトリー→ショーニューロード",
+  "キノピオファクトリー→ホネホネツイスター",
+  "キノピオファクトリー→モーモーカントリー",
+  "キノピオファクトリー→チョコマウンテン",
+  "キノピオファクトリー→クッパキャッスル",
+  "キノピオファクトリー→どんぐりツリーハウス",
   "キノピオファクトリー→マリオサーキット",
+  "キノピオファクトリー→ピーチスタジアム",
+
+  "クッパキャッスル→ワリオスタジアム",
+  "クッパキャッスル→キラーシップ",
+  "クッパキャッスル→ホネホネツイスター",
+  "クッパキャッスル→チョコマウンテン",
+  "クッパキャッスル→キノピオファクトリー",
   "クッパキャッスル→マリオサーキット",
+
+  "どんぐりツリーハウス→ショーニューロード",
+  "どんぐりツリーハウス→おばけシネマ",
+  "どんぐりツリーハウス→ホネホネツイスター",
+  "どんぐりツリーハウス→キノピオファクトリー",
   "どんぐりツリーハウス→マリオサーキット",
 
-  "トロフィーシティ→ピーチスタジアム",
-  "ノコノコビーチ→ピーチスタジアム",
-  "リバーサイドサファリ→ピーチスタジアム",
-  "プクプクフォールズ→ピーチスタジアム",
-  "モーモーカントリー→ピーチスタジアム",
-  "チョコマウンテン→ピーチスタジアム",
-  "キノピオファクトリー→ピーチスタジアム",
+  "マリオサーキット→ロゼッタてんもんだい",
+  "マリオサーキット→ショーニューロード",
+  "マリオサーキット→おばけシネマ",
+  "マリオサーキット→ホネホネツイスター",
+  "マリオサーキット→モーモーカントリー",
+  "マリオサーキット→キノピオファクトリー",
+  "マリオサーキット→クッパキャッスル",
+  "マリオサーキット→どんぐりツリーハウス",
   "マリオサーキット→ピーチスタジアム",
 
+  "ピーチスタジアム→トロフィーシティ",
+  "ピーチスタジアム→ノコノコビーチ",
+  "ピーチスタジアム→リバーサイドサファリ",
+  "ピーチスタジアム→プクプクフォールズ",
+  "ピーチスタジアム→モーモーカントリー",
+  "ピーチスタジアム→チョコマウンテン",
+  "ピーチスタジアム→キノピオファクトリー",
   "ピーチスタジアム→レインボーロード"
 ];
+
 const state = {
   mode: "6v6",
   teams: ["チーム1","チーム2","チーム3","チーム4"],
@@ -280,6 +314,7 @@ window.state = {
   timestamp: null,
   backgroundImage: null
 };
+
 
 /* ============================================================
    IndexedDB（history）
@@ -347,6 +382,7 @@ async function loadLocalHistory() {
     const list = req.result || [];
     state._history = list;
     renderLocalHistory(list);
+    updateAnalysisTeamSelect();   // ★ 履歴読み込み後に分析用セレクト更新
   };
 }
 
@@ -379,6 +415,14 @@ function renderLocalHistory(list) {
         <div><strong>${dateStr}</strong>（自チーム：${rec.myTeam}）</div>
         <div>${ranking}</div>
       `;
+
+      // ★ この戦績を analysis に復元して分析する
+      div.addEventListener("click", () => {
+        restoreFromRecordForAnalysis(rec);
+        updateAnalysisTeamSelect();
+        updateTeamAnalysis();
+      });
+
       container.appendChild(div);
     });
 }
@@ -396,6 +440,23 @@ function calcScoresFromRecord(rec) {
   });
   return result;
 }
+
+function showTab(tabId) {
+  // 全タブ非表示
+  document.querySelectorAll(".tabContent").forEach(t => t.style.display = "none");
+
+  // 表示
+  document.getElementById(tabId).style.display = "block";
+
+  // overlay タブ以外では iframe を無効化
+  const iframe = document.getElementById("overlayFrame");
+  if (tabId !== "overlayTab") {
+    iframe.style.display = "none";   // ← 完全に消す
+  } else {
+    iframe.style.display = "block";
+  }
+}
+
 
 
 /* ============================================================
@@ -488,6 +549,31 @@ function getUserTimestamp() {
 
   return d.getTime();
 }
+
+
+function getLatestTeams() {
+  const latest = (state._history && state._history[0]) || null;
+
+  let my = state.myTeam;
+  let enemies = state.enemyTeams;
+
+  if (latest) {
+    if (latest.myTeam) my = latest.myTeam;
+    if (latest.enemyTeams) enemies = latest.enemyTeams;
+  }
+
+  return {
+    myTeam: my,
+    enemyTeams: enemies || [],
+    allTeams: [my, ...(enemies || [])]
+  };
+}
+
+function getEnemyTeamsOnly() {
+  return getLatestTeams().enemyTeams;
+}
+
+
 
 /* ============================================================
    webhook設定
@@ -744,6 +830,7 @@ function applyTeamNames() {
   state.penalty = {};
 
   setFormatFromMode(state.mode);
+  sendOverlay();
   alert("チーム名を更新しました");
 }
 
@@ -852,21 +939,31 @@ function toggleRank(team, round, rank, btn) {
   const arr = state.teamRanks[team][round];
   const idx = arr.indexOf(rank);
 
+  // ① 選択済み → 必ず解除できる
   if (idx >= 0) {
-    arr.splice(idx,1);
+    arr.splice(idx, 1);
     btn.classList.remove("selected");
-  } else {
-    if (arr.length < state.teamSizeMap[team]) {
-      arr.push(rank);
-      btn.classList.add("selected");
-    } else {
-      alert(`${team} は最大 ${state.teamSizeMap[team]} 人です`);
-    }
+    updateScores();
+    return;
   }
 
+  // ② 未選択 → 人数制限チェックして追加
+  const need = state.teamSizeMap[team];
+  if (arr.length < need) {
+    arr.push(rank);
+    btn.classList.add("selected");
+  } else {
+    alert(`${team} は最大 ${need} 人です`);
+    return;
+  }
+
+  // ③ 自動補完はそのまま動く
   autoFillMissingTeam(round);
+
   updateScores();
 }
+
+
 
 function autoFillMissingTeam(round) {
   const filled = state.teams.filter(t =>
@@ -979,6 +1076,11 @@ function confirmRound(round) {
   // 12R 目ならリザルト送信なども可能
 }
 
+let overlayWin = null;
+
+function openOverlay() {
+  overlayWin = window.open("overlay.html", "overlayWindow");
+}
 
 
 
@@ -1039,6 +1141,16 @@ function loadBackgroundImage(file) {
 }
 
 
+function initTeamRanks() {
+  state.teamRanks = {};
+
+  for (const team of state.teams) {
+    state.teamRanks[team] = [];
+    for (let r = 0; r < state.totalRounds; r++) {
+      state.teamRanks[team][r] = [];
+    }
+  }
+}
 
 /* ============================================================
    集計機能
@@ -1187,73 +1299,332 @@ async function sendInstantScore() {
 }
 
 
-async function sendInstantScoreMulti(silent = false) {
-  // ★ ON の Webhook だけ抽出
-  const enabledWebhooks = webhookList.filter(w => w.enabled);
+/* ============================================================
+   OBS Custom Event (Payload) 送信処理
+============================================================ */
+/* ============================================================
+   OBS WebSocket 接続 ＆ 送信関数
+============================================================ */
 
-  if (!enabledWebhooks.length) {
-    if (!silent) alert("有効な Webhook がありません");
-    return;
-  }
+/* ============================================================
+   送信側: オーバーレイデータ送信処理 (sendOverlay)
+============================================================ */
+function saveOBSSettings() {
+  localStorage.setItem(
+    "obsSettings",
+    JSON.stringify({
+      host: document.getElementById("obsHost").value,
+      port: document.getElementById("obsPort").value,
+      password: document.getElementById("obsPassword").value
+    })
+  );
+}
 
-  const ranking = calcRanking();
-  if (!ranking.length) return;
+function loadOBSSettings() {
+  const raw =
+    localStorage.getItem("obsSettings");
 
-  const top = ranking[0].score;
+  if (!raw) return;
 
-  const text =
-    `【即時集計】\n\n` +
-    ranking.map((t, i) => {
-      const diff = t.score - top;
-      return `${i + 1}位：${t.team} ${t.score}点 ${diff === 0 ? "" : `(${diff})`}`;
-    }).join("\n");
+  const s = JSON.parse(raw);
 
-  const payload = {
-    username: "MK Sokuzi",
-    embeds: [
-      {
-        title: `📊 現在のスコア（自チーム：${state.myTeam}）`,
-        description: text,
-        color: 3447003,
-        timestamp: new Date().toISOString()
-      }
-    ]
-  };
-
-  // ★ ON の Webhook だけに送信
-  for (const w of enabledWebhooks) {
-    try {
-      await fetch(w.url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload)
-      });
-    } catch (e) {
-      console.warn("Webhook 送信失敗:", w.url, e);
-    }
-  }
-
-  if (!silent) alert("途中経過を送信しました");
+  obsHost.value = s.host || "localhost";
+  obsPort.value = s.port || "4455";
+  obsPassword.value = s.password || "";
 }
 
 
+const obs = new OBSWebSocket();
+
+async function connectOBS() {
+
+  try {
+
+    const host =
+      document.getElementById("obsHost").value;
+
+    const port =
+      document.getElementById("obsPort").value;
+
+    const password =
+      document.getElementById("obsPassword").value;
+
+    await obs.connect(
+      `ws://${host}:${port}`,
+      password
+    );
+
+    document.getElementById(
+      "obsStatus"
+    ).textContent = "接続成功";
+
+    saveOBSSettings();
+
+  } catch(e) {
+
+    document.getElementById(
+      "obsStatus"
+    ).textContent = "接続失敗";
+
+    console.error(e);
+
+  }
+}
+
+async function disconnectOBS() {
+
+  try {
+
+    await obs.disconnect();
+
+    obsStatus.textContent = "切断";
+
+  } catch(e) {
+    console.error(e);
+  }
+
+}
+
+/**
+ * 即時集計の途中経過をオーバーレイへ送信する関数
+ */
+async function sendOverlay() {
+  // 1. 各チームのスコア計算
+  let scores = calculateTeamScores(); // 既存の関数を活用
+
+  // 【1R目入力前対応】scores が空、または全チーム揃っていない場合は 0 点で補完
+  if (!scores || Object.keys(scores).length === 0) {
+    scores = {};
+    if (state.teams && Array.isArray(state.teams)) {
+      state.teams.forEach(team => {
+        scores[team] = 0;
+      });
+    }
+  }
+
+  // 2. 現在進行中の最大ラウンド数を判定
+  let currentRound = 0;
+  if (typeof totalRounds !== "undefined") {
+    for (let r = 0; r < totalRounds; r++) {
+      let hasData = false;
+      for (const team of (state.teams || [])) {
+        if (state.teamRanks && state.teamRanks[team] && state.teamRanks[team][r] && state.teamRanks[team][r].length > 0) {
+          hasData = true;
+          break;
+        }
+      }
+      if (hasData) {
+        currentRound = r + 1; // 1-indexed
+      }
+    }
+  }
+
+  // 3. 送信データの組み立て
+  const dataToSend = {
+    type: "MKADP_SOKUZI_UPDATE",
+    currentRound: currentRound, // 1R入力前は 0 になります
+    totalRounds: typeof totalRounds !== "undefined" ? totalRounds : 12,
+    myTeam: state.myTeam || "自チーム",
+    scores: scores,               // 例: { "チーム1": 0, "チーム2": 0, ... }
+    penalty: state.penalty || {}  // ペナルティ点数
+  };
+
+  // 4. 別ウィンドウ (window.open で開いた場合) へ送信
+  if (typeof overlayWin !== "undefined" && overlayWin && !overlayWin.closed) {
+    overlayWin.postMessage(dataToSend, "*");
+  }
+
+  // 5. PeerJS 経由で送信
+  if (typeof peerConn !== "undefined" && peerConn && peerConn.open) {
+    peerConn.send(dataToSend);
+  }
+
+  // 6. OBS WebSocket 経由で送信
+  try {
+    if (typeof obs !== "undefined") {
+      if (!obs.socket || obs.socket.readyState !== WebSocket.OPEN) {
+        if (typeof connectOBS === "function") {
+          await connectOBS();
+        }
+      }
+
+      if (obs.socket && obs.socket.readyState === WebSocket.OPEN) {
+        await obs.call("BroadcastCustomEvent", {
+          vendorName: "mk-sokuzi",
+          eventData: dataToSend
+        });
+        console.log("[送信側] OBS 送信成功:", dataToSend);
+      }
+    }
+  } catch (e) {
+    console.error("[送信側] OBS 送信エラー:", e);
+  }
+}
+  
+async function sendOBSPayload(payload) {
+  try {
+    // 接続していない場合は接続を試みる
+    if (!obs.socket || obs.socket.readyState !== WebSocket.OPEN) {
+      const connected = await connectOBS(false);
+      if (!connected) return;
+    }
+
+    // BroadcastCustomEvent を使用して送信
+    // eventData に payload を直接渡すことで、受信側の event.detail が payload になります
+    await obs.call("BroadcastCustomEvent", {
+      vendorName: "mk-sokuzi",
+      eventData: payload
+    });
+
+    console.log("[送信側] OBS CustomEvent 送信完了:", payload);
+  } catch (e) {
+    console.warn("[送信側] OBS CustomEvent 送信失敗:", e);
+  }
+}
+
+/* ============================================================
+   即時集計 ＆ 送信処理（元のコードそのまま）
+============================================================ */
+
+async function sendInstantScoreMulti(silent = false) {
+  const ranking = calcRanking();
+  if (!ranking.length) {
+    if (!silent) alert("スコアがありません");
+    return;
+  }
+
+  const top = ranking[0].score;
+
+  // 1. OBS（ブラウザソース）へ渡す Payload 構造体の作成
+  const scorePayload = {
+    myTeam: state.myTeam,
+    timestamp: new Date().toISOString(),
+    ranking: ranking.map((t, i) => ({
+      rank: i + 1,
+      team: t.team,
+      score: t.score,
+      diff: t.score - top,
+      isMyTeam: t.team === state.myTeam
+    }))
+  };
+
+  // 2. OBSに Payload を送信
+  await sendOBSPayload(scorePayload);
+
+  // 3. 有効な Webhook へ送信（従来通り）
+  const enabledWebhooks = webhookList.filter(w => w.enabled);
+  if (enabledWebhooks.length) {
+    const text =
+      `【即時集計】\n\n` +
+      ranking.map((t, i) => {
+        const diff = t.score - top;
+        return `${i + 1}位：${t.team} ${t.score}点 ${diff === 0 ? "" : `(${diff})`}`;
+      }).join("\n");
+
+    const discordPayload = {
+      username: "MK Sokuzi",
+      embeds: [
+        {
+          title: `📊 現在のスコア（自チーム：${state.myTeam}）`,
+          description: text,
+          color: 3447003,
+          timestamp: new Date().toISOString()
+        }
+      ]
+    };
+
+    for (const w of enabledWebhooks) {
+      try {
+        await fetch(w.url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(discordPayload)
+        });
+      } catch (e) {
+        console.warn("Webhook 送信失敗:", w.url, e);
+      }
+    }
+  }
+
+  if (!silent) alert("途中経過（Payload）を送信しました");
+}
 /* ============================================================
    分析関連
 ============================================================ */
 
-function initTeamAnalysisUI() {
+function restoreFromRecordForAnalysis(rec) {
+  // 試合データを analysis 用の state に復元
+  state.teams        = rec.teams || [];
+  state.myTeam       = rec.myTeam || "";
+  state.enemyTeams   = rec.enemyTeams || [];
+  state.courseNames  = rec.courses || [];
+  state.teamRanks    = rec.teamRanks || {};
+  state.penalty      = rec.penalty || {};
+  state.backgroundImage = rec.backgroundImage || null;
+}
+
+function updateAnalysisTeamSelect() {
   const sel = document.getElementById("analysisTeamSelect");
   if (!sel) return;
-  if (!state.teams || state.teams.length === 0) return;
 
-  sel.innerHTML = state.teams
-    .map(t => `<option value="${t}">${t}</option>`)
-    .join("");
+  const teams = new Set();
+  (state._history || []).forEach(rec => teams.add(rec.myTeam));
 
-  // 初期表示
+  sel.innerHTML = [...teams].map(t => `<option value="${t}">${t}</option>`).join("");
+}
+
+function onSelectHistoryForAnalysis(recId) {
+  const rec = state._history.find(r => r.id === recId);
+  if (!rec) return;
+
+  restoreFromRecordForAnalysis(rec);
   updateTeamAnalysis();
 }
 
+
+function initTeamAnalysisUI() {
+  const sel = document.getElementById("analysisTeamSelect");
+  if (!sel) return;
+
+  const { myTeam, enemyTeams } = getLatestTeams();
+
+  const teams = [myTeam, ...enemyTeams];
+
+  sel.innerHTML = teams
+    .map(t => `<option value="${t}">${t}</option>`)
+    .join("");
+
+  sel.value = myTeam;
+
+  updateTeamAnalysis();
+}
+
+function getTeamsFoughtWith(myTeam) {
+  const set = new Set();
+
+  for (const raceId in state.teamRanks) {
+    const teams = Object.keys(state.teamRanks[raceId]);
+    if (!teams.includes(myTeam)) continue;
+    teams.forEach(t => { if (t !== myTeam) set.add(t); });
+  }
+
+  return [...set];
+}
+
+
+function getRacesOfTeam(myTeam) {
+  const list = [];
+
+  for (const raceId in state.teamRanks) {
+    const teams = Object.keys(state.teamRanks[raceId]);
+    if (teams.includes(myTeam)) list.push(raceId);
+  }
+
+  return list;
+}
+
+
+  
 function calcStdDev(values) {
   if (!values || values.length === 0) return 0;
   const avg = values.reduce((a, b) => a + b, 0) / values.length;
@@ -1294,98 +1665,89 @@ function calcCourseStats(team) {
   return stats;
 }
 
-function calcOpponentStats(team) {
+function calcOpponentStats(myTeam) {
+  const enemies = getTeamsFoughtWith(myTeam);
+  const races = getRacesOfTeam(myTeam);
+
   const stats = {};
+  enemies.forEach(t => stats[t] = { count: 0, wins: 0, scoreDiff: 0 });
 
-  for (const opp of state.teams) {
-    if (opp === team) continue;
+  for (const raceId of races) {
+    const ranks = state.teamRanks[raceId];
+    const myRank = ranks[myTeam];
 
-    stats[opp] = {
-      count: 0,
-      wins: 0,
-      scoreDiff: 0
-    };
-  }
-
-  const myRecords = state.teamRanks[team] || [];
-
-  for (const r of myRecords) {
-    for (const opp of state.teams) {
-      if (opp === team) continue;
-
-      const oppRecord = state.teamRanks[opp]?.find(x => x.raceId === r.raceId);
-      if (!oppRecord) continue;
+    for (const opp of enemies) {
+      const oppRank = ranks[opp];
+      if (oppRank == null) continue;
 
       stats[opp].count++;
-      if (r.rank < oppRecord.rank) stats[opp].wins++;
-      stats[opp].scoreDiff += (r.score - oppRecord.score);
+      if (myRank < oppRank) stats[opp].wins++;
+      stats[opp].scoreDiff += (oppRank - myRank);
     }
   }
 
   return stats;
 }
 
-function calcCourseOpponentMatrix(team) {
+
+function calcCourseOpponentMatrix(myTeam) {
+  const enemies = getTeamsFoughtWith(myTeam);
   const matrix = {};
 
-  for (const course of state.courseNames) {
-    matrix[course] = {};
-    for (const opp of state.teams) {
-      if (opp === team) continue;
-      matrix[course][opp] = { count: 0, wins: 0 };
-    }
-  }
+  state.courseNames.forEach(c => {
+    matrix[c] = {};
+    enemies.forEach(e => matrix[c][e] = { count: 0, wins: 0 });
+  });
 
-  const myRecords = state.teamRanks[team] || [];
+  for (const raceId in state.teamRanks) {
+    const race = state.races[raceId];
+    if (!race || race.myTeam !== myTeam) continue;
 
-  for (const r of myRecords) {
-    const course = r.course;
+    const course = race.course;
+    const ranks = state.teamRanks[raceId];
+    const myRank = ranks[myTeam];
 
-    for (const opp of state.teams) {
-      if (opp === team) continue;
+    for (const opp of enemies) {
+      const oppRank = ranks[opp];
+      if (oppRank == null) continue;
 
-      const oppRecord = state.teamRanks[opp]?.find(x => x.raceId === r.raceId);
-      if (!oppRecord) continue;
-
-      const cell = matrix[course][opp];
-      cell.count++;
-      if (r.rank < oppRecord.rank) cell.wins++;
+      matrix[course][opp].count++;
+      if (myRank < oppRank) matrix[course][opp].wins++;
     }
   }
 
   return matrix;
 }
 
-function calcCourseOpponentScoreDiffMatrix(team) {
+function calcCourseOpponentScoreDiffMatrix(myTeam) {
+  const enemies = getTeamsFoughtWith(myTeam);
   const matrix = {};
 
-  for (const course of state.courseNames) {
-    matrix[course] = {};
-    for (const opp of state.teams) {
-      if (opp === team) continue;
-      matrix[course][opp] = { count: 0, scoreDiff: 0 };
-    }
-  }
+  state.courseNames.forEach(c => {
+    matrix[c] = {};
+    enemies.forEach(e => matrix[c][e] = { count: 0, scoreDiff: 0 });
+  });
 
-  const myRecords = state.teamRanks[team] || [];
+  for (const raceId in state.teamRanks) {
+    const race = state.races[raceId];
+    if (!race || race.myTeam !== myTeam) continue;
 
-  for (const r of myRecords) {
-    const course = r.course;
+    const course = race.course;
+    const ranks = state.teamRanks[raceId];
+    const myRank = ranks[myTeam];
 
-    for (const opp of state.teams) {
-      if (opp === team) continue;
+    for (const opp of enemies) {
+      const oppRank = ranks[opp];
+      if (oppRank == null) continue;
 
-      const oppRecord = state.teamRanks[opp]?.find(x => x.raceId === r.raceId);
-      if (!oppRecord) continue;
-
-      const cell = matrix[course][opp];
-      cell.count++;
-      cell.scoreDiff += (r.score - oppRecord.score);
+      matrix[course][opp].count++;
+      matrix[course][opp].scoreDiff += (oppRank - myRank);
     }
   }
 
   return matrix;
 }
+
 
 function calcCourseStrengthRanking(team) {
   const stats = calcCourseStats(team);
@@ -1475,9 +1837,11 @@ function renderCourseStats(stats) {
   table.innerHTML = html;
 }
 
-function renderOpponentStats(stats) {
+function renderOpponentStats(stats, myTeam) {
   const table = document.getElementById("tableOpponentStats");
   if (!table) return;
+
+  const enemies = getTeamsFoughtWith(myTeam);
 
   let html = `
     <tr>
@@ -1488,11 +1852,9 @@ function renderOpponentStats(stats) {
     </tr>
   `;
 
-  for (const opp of state.teams) {
-    if (!stats[opp]) continue;
-
+  for (const opp of enemies) {
     const s = stats[opp];
-    if (s.count === 0) continue;
+    if (!s || s.count === 0) continue;
 
     html += `
       <tr>
@@ -1507,24 +1869,25 @@ function renderOpponentStats(stats) {
   table.innerHTML = html;
 }
 
-function renderCourseOpponentMatrix(matrix) {
+function renderCourseOpponentMatrix(matrix, myTeam) {
   const table = document.getElementById("tableCourseOpponentMatrix");
   if (!table) return;
 
+  const enemies = getTeamsFoughtWith(myTeam);
+
   let html = "<tr><th>コース</th>";
-  for (const opp of state.teams) html += `<th>${opp}</th>`;
+  enemies.forEach(e => html += `<th>${e}</th>`);
   html += "</tr>";
 
   for (const course of state.courseNames) {
     html += `<tr><td>${course}</td>`;
 
-    for (const opp of state.teams) {
+    for (const opp of enemies) {
       const cell = matrix[course][opp];
       if (!cell || cell.count === 0) {
         html += "<td>-</td>";
         continue;
       }
-
       html += `<td>${(cell.wins / cell.count * 100).toFixed(1)}%</td>`;
     }
 
@@ -1534,24 +1897,26 @@ function renderCourseOpponentMatrix(matrix) {
   table.innerHTML = html;
 }
 
-function renderCourseOpponentScoreDiffMatrix(matrix) {
+
+function renderCourseOpponentScoreDiffMatrix(matrix, myTeam) {
   const table = document.getElementById("tableCourseOpponentScoreDiffMatrix");
   if (!table) return;
 
+  const enemies = getTeamsFoughtWith(myTeam);
+
   let html = "<tr><th>コース</th>";
-  for (const opp of state.teams) html += `<th>${opp}</th>`;
+  enemies.forEach(e => html += `<th>${e}</th>`);
   html += "</tr>";
 
   for (const course of state.courseNames) {
     html += `<tr><td>${course}</td>`;
 
-    for (const opp of state.teams) {
+    for (const opp of enemies) {
       const cell = matrix[course][opp];
       if (!cell || cell.count === 0) {
         html += "<td>-</td>";
         continue;
       }
-
       html += `<td>${(cell.scoreDiff / cell.count).toFixed(2)}</td>`;
     }
 
@@ -1561,24 +1926,27 @@ function renderCourseOpponentScoreDiffMatrix(matrix) {
   table.innerHTML = html;
 }
 
+
 let courseRadarChart = null;
 
-function buildCourseRadarData(team) {
-  const stats = calcCourseStats(team);
+function buildOpponentRadarData(myTeam) {
+  const stats = calcOpponentStats(myTeam);
+  const enemies = getTeamsFoughtWith(myTeam);
 
   return {
-    labels: state.courseNames,
+    labels: enemies,
     datasets: [{
-      label: `${team} 平均得点`,
-      data: state.courseNames.map(c => {
-        const s = stats[c];
-        return s.count ? (s.totalScore / s.count) : 0;
+      label: `${myTeam} vs 相手チーム 平均得点差`,
+      data: enemies.map(opp => {
+        const s = stats[opp];
+        return s.count ? (s.scoreDiff / s.count) : 0;
       }),
-      borderColor: "rgba(255,99,132,1)",
-      backgroundColor: "rgba(255,99,132,0.2)"
+      borderColor: "rgba(54,162,235,1)",
+      backgroundColor: "rgba(54,162,235,0.2)"
     }]
   };
 }
+
 
 function renderCourseRadar(team) {
   const ctx = document.getElementById("chartCourseRadar").getContext("2d");
@@ -1599,17 +1967,16 @@ let opponentRadarChart = null;
 
 function buildOpponentRadarData(team) {
   const stats = calcOpponentStats(team);
+  const enemyTeams = getEnemyTeamsOnly();  // ★ 相手チームだけ取得
 
   return {
-    labels: state.teams.filter(t => t !== team),
+    labels: enemyTeams,  // ★ 自チームを除外する必要なし（enemyTeams は相手だけ）
     datasets: [{
       label: `${team} vs 相手チーム 平均得点差`,
-      data: state.teams
-        .filter(t => t !== team)
-        .map(opp => {
-          const s = stats[opp];
-          return s.count ? (s.scoreDiff / s.count) : 0;
-        }),
+      data: enemyTeams.map(opp => {
+        const s = stats[opp];
+        return s.count ? (s.scoreDiff / s.count) : 0;
+      }),
       borderColor: "rgba(54,162,235,1)",
       backgroundColor: "rgba(54,162,235,0.2)"
     }]
@@ -1631,33 +1998,28 @@ function renderOpponentRadar(team) {
   });
 }
 
-let heatmapChart = null;
-
-function buildCourseOpponentHeatmap(team) {
-  const matrix = calcCourseOpponentScoreDiffMatrix(team);
+function buildCourseOpponentHeatmap(myTeam) {
+  const matrix = calcCourseOpponentScoreDiffMatrix(myTeam);
+  const enemies = getTeamsFoughtWith(myTeam);
   const data = [];
 
-  state.courseNames.forEach((course, i) => {
-    state.teams.forEach((opp, j) => {
-      if (opp === team) return;
-
+  state.courseNames.forEach(course => {
+    enemies.forEach(opp => {
       const cell = matrix[course][opp];
       const value = cell && cell.count ? (cell.scoreDiff / cell.count) : 0;
 
-      data.push({
-        x: opp,
-        y: course,
-        v: value
-      });
+      data.push({ x: opp, y: course, v: value });
     });
   });
 
   return data;
 }
 
-function renderCourseOpponentHeatmap(team) {
+
+function renderCourseOpponentHeatmap(myTeam) {
   const ctx = document.getElementById("chartCourseOpponentHeatmap").getContext("2d");
-  const data = buildCourseOpponentHeatmap(team);
+  const data = buildCourseOpponentHeatmap(myTeam);
+  const enemies = getTeamsFoughtWith(myTeam);
 
   if (heatmapChart) heatmapChart.destroy();
 
@@ -1671,13 +2033,13 @@ function renderCourseOpponentHeatmap(team) {
           const v = ctx.dataset.data[ctx.dataIndex].v;
           return v > 0 ? "rgba(0,200,0,0.6)" : "rgba(200,0,0,0.6)";
         },
-        width: ({chart}) => (chart.chartArea.width / state.teams.length),
+        width: ({chart}) => (chart.chartArea.width / enemies.length),
         height: ({chart}) => (chart.chartArea.height / state.courseNames.length)
       }]
     },
     options: {
       scales: {
-        x: { type: "category", labels: state.teams },
+        x: { type: "category", labels: enemies },
         y: { type: "category", labels: state.courseNames }
       }
     }
@@ -1711,6 +2073,7 @@ function updateTeamAnalysis() {
   renderStableCourseRanking(stability.stable);
   renderUnstableCourseRanking(stability.unstable);
 }
+
 
 
 /* ============================================================
@@ -2000,85 +2363,165 @@ function onP2PMessage(ev) {
    リザルト画像生成
 ============================================================ */
 
+state.resultTextColor = "#ffffff";
+state.resultTextShadow = false;
+state.resultStroke = false;
+state.resultBgBrightness = 1;
+
+function setResultTextColor(v) { state.resultTextColor = v; }
+function setResultTextShadow(v) { state.resultTextShadow = v; }
+function setResultStroke(v) { state.resultStroke = v; }
+function setResultBgBrightness(v) { state.resultBgBrightness = parseFloat(v); }
+ 
+
 async function generateResultImage() {
   const canvas = document.getElementById("resultCanvas");
   const ctx = canvas.getContext("2d");
   const w = canvas.width;
   const h = canvas.height;
 
-  // 背景画像がある場合
+  /* ============================
+     背景描画（明暗調整対応）
+  ============================ */
   if (state.backgroundImage) {
     const img = new Image();
     img.src = state.backgroundImage;
     await img.decode();
     ctx.drawImage(img, 0, 0, w, h);
   } else {
-    // デフォルト背景
-    ctx.fillStyle = "#8b0000"; // 濃い赤
+    ctx.fillStyle = "#8b0000";
     ctx.fillRect(0, 0, w, h);
   }
 
-  // ここから先は既存の描画処理
-  ctx.fillStyle = "#fff";
-  ctx.font = "28px sans-serif";
-  ctx.fillText("MK Result", 20, 40);
+  // 明暗調整（brightness）
+  if (state.resultBgBrightness !== 1) {
+    // 1 → 透明、0.5 → 黒50%、1.5 → 白50%
+    if (state.resultBgBrightness < 1) {
+      const alpha = 1 - state.resultBgBrightness;
+      ctx.fillStyle = `rgba(0,0,0,${alpha})`;
+      ctx.fillRect(0, 0, w, h);
+    } else {
+      const alpha = state.resultBgBrightness - 1;
+      ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+      ctx.fillRect(0, 0, w, h);
+    }
+  }
+
+  /* ============================
+     テキスト描画用関数（影・縁取り対応）
+  ============================ */
+  function drawText(text, x, y, fontSize = 28, align = "left", color = state.resultTextColor) {
+    ctx.font = `${fontSize}px sans-serif`;
+    ctx.textAlign = align;
+    ctx.textBaseline = "top";
+
+    // 影
+    if (state.resultTextShadow) {
+      ctx.shadowColor = "rgba(0,0,0,0.8)";
+      ctx.shadowBlur = 6;
+      ctx.shadowOffsetX = 3;
+      ctx.shadowOffsetY = 3;
+    } else {
+      ctx.shadowColor = "transparent";
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
+    }
+
+    // 縁取り
+    if (state.resultStroke) {
+      ctx.lineWidth = 6;
+      ctx.strokeStyle = "black";
+      ctx.strokeText(text, x, y);
+    }
+
+    // 本体
+    ctx.fillStyle = color;
+    ctx.fillText(text, x, y);
+  }
+
+  /* ============================
+     ここから既存の描画処理
+  ============================ */
+
+  drawText("MK Result", 20, 40, 32);
 
   const d = new Date(state.timestamp || Date.now());
-  ctx.font = "16px sans-serif";
-  ctx.fillText(d.toLocaleString(), 20, 70);
-  ctx.fillText(`自チーム：${state.myTeam}`, 20, 95);
+  drawText(d.toLocaleString(), 20, 80, 18);
+  drawText(`自チーム：${state.myTeam}`, 20, 105, 18);
 
   const scores = calculateTeamScores();
   const ranking = Object.entries(scores).sort((a,b)=>b[1]-a[1]);
 
-  ctx.font = "20px sans-serif";
-  ctx.fillText("総合スコア", 20, 130);
+  drawText("総合スコア", 20, 140, 24);
 
-  let y = 160;
+  let y = 175;
   ranking.forEach(([team,score],i)=>{
     const diff = score - ranking[0][1];
-    ctx.fillStyle = (team === state.myTeam) ? "#4caf50" : "#fff";
-    ctx.fillText(`${i+1}位 ${team} ${score}点 ${diff===0?"":`(${diff})`}`, 40, y);
-    y += 28;
+    const color = (team === state.myTeam) ? "#4caf50" : state.resultTextColor;
+    drawText(`${i+1}位 ${team} ${score}点 ${diff===0?"":`(${diff})`}`, 40, y, 20, "left", color);
+    y += 30;
   });
 
   const roundScores = calcRoundScores();
-  ctx.fillStyle = "#fff";
-  ctx.font = "18px sans-serif";
-  ctx.fillText("ラウンド別スコア", 20, y + 20);
+  drawText("ラウンド別スコア", 20, y + 20, 22);
 
-  let yy = y + 50;
+  let yy = y + 55;
   for (let r=0; r<totalRounds; r++) {
     const course = state.courseNames[r] || `R${r+1}`;
-    ctx.font = "14px sans-serif";
-    ctx.fillText(`${r+1}R ${course}`, 20, yy);
+    drawText(`${r+1}R ${course}`, 20, yy, 16);
+
     let xx = 200;
     ranking.forEach(([team])=>{
       const s = roundScores[r][team];
-      ctx.fillText(`${team}:${s}`, xx, yy);
+      drawText(`${team}:${s}`, xx, yy, 16);
       xx += 150;
     });
-    yy += 22;
+
+    yy += 26;
     if (yy > h - 40) break;
   }
 
   canvas.style.display = "block";
 }
 
+function updateOverlayIframe() {
+  const user = document.getElementById("overlayUser")?.value?.trim() || "default";
+  const frame = document.getElementById("overlayFrame");
+  if (frame) {
+    frame.src = "https://sorute03.github.io/MKteamsokuzi/overlay.html?user=" + encodeURIComponent(user);
+  }
+}
+
+
+
+// ▼ ページ読み込み時にユーザー名を自動入力
+window.addEventListener("DOMContentLoaded", () => {
+  const savedUser = localStorage.getItem("overlayUser");
+  const input = document.getElementById("overlayUser");
+
+  if (savedUser && input) {
+    input.value = savedUser;
+  }
+
+  updateOverlayIframe(); // ← ★ これが重要
+});
+
+
+
+
+// ▼ 入力変更時に保存
+document.getElementById("overlayUser")?.addEventListener("input", (e) => {
+  const user = e.target.value.trim();
+  localStorage.setItem("overlayUser", user);
+
+  updateOverlayIframe(); // ← ★ これがないと iframe が更新されない
+});
 
 
 /* ============================================================
    共有保存（GAS）ダミー
 ============================================================ */
-
-function sendHistoryToGAS() {
-  // HTML の「この試合を共有保存」ボタン用ダミー
-  // 必要になったら GAS_URL を使って実装する
-  alert("共有保存（GAS）はまだ実装されていません");
-}
-
-const GAS_URL = "https://script.google.com/macros/s/AKfycbw6V8r0QeDs6PTzgU_tC0mWe6vOojWAB6_Rfj1Q7KBcf2htcZNSnHFkB9F1ENi-BRuc/exec"; // ← あなたの GAS URL
-
 function buildOverlayPayload() {
   if (!window.state) {
     console.warn("state が存在しません");
@@ -2097,10 +2540,19 @@ function buildOverlayPayload() {
     scores: calculateTeamScores() || {}
   };
 }
+// ▼ 入力変更時に保存
 
+
+  
+function sendHistoryToGAS() {
+  // HTML の「この試合を共有保存」ボタン用ダミー
+  // 必要になったら GAS_URL を使って実装する
+  alert("共有保存（GAS）はまだ実装されていません");
+}
+
+const GAS_URL = "https://script.google.com/macros/s/AKfycbw6V8r0QeDs6PTzgU_tC0mWe6vOojWAB6_Rfj1Q7KBcf2htcZNSnHFkB9F1ENi-BRuc/exec"; // ← あなたの GAS URL
 
 // ▼ 送信用チャンネルを作成
-const bc = new BroadcastChannel("mk_overlay");
 
 // ▼ overlay.html からの要求を受信
 window.addEventListener("message", (event) => {
@@ -2108,12 +2560,6 @@ window.addEventListener("message", (event) => {
     sendOverlay();
   }
 });
-let overlayWin = null;
-
-function openOverlay() {
-  overlayWin = window.open("overlay.html", "overlayWindow");
-}
-
 
 // ▼ overlay.html に途中経過を返す
 
@@ -2121,31 +2567,90 @@ function openOverlayWindow() {
   overlayWin = window.open("overlay.html", "overlayWindow");
 }
 
-async function sendOverlay() {
+function openOverlay() {
+  const user = document.getElementById("overlayUser").value.trim();
+  if (!user) return alert("ユーザー名を入力してください");
+
+  document.getElementById("overlayFrame").src =
+    `https://sorute03.github.io/MKteamsokuzi/sokuzioverlay.html`;
+}
+
+function getUser() {
+  return document.getElementById("overlayUser")?.value?.trim() || "default";
+}
+
+function sendOverlay2() {
   const payload = buildOverlayPayload();
+  if (!payload) return;
 
-  if (!payload) {
-    console.warn("sendOverlay: payload が生成できませんでした");
-    return;
-  }
+  const user = getUser();
+  payload.user = user;
 
-  console.log("送信前 payload:", payload);
+  // ▼ ユーザー別チャンネル
+  const bc = new BroadcastChannel("overlay_channel_" + user);
 
-  // ▼ GAS に送信（今まで通り）
-  const form = new FormData();
-  form.append("payload", JSON.stringify(payload));
-  await fetch(GAS_URL, {
-    method: "POST",
-    body: form,
-    mode: "no-cors"
+  // ▼ OBS / 別タブ / 別ウィンドウへ送信
+  bc.postMessage({
+    type: "overlay",
+    user,
+    payload
   });
 
-  // ▼ overlay.html (iframe) にも postMessage で送信
+  // ▼ iframe へ送信（必要なら）
   const frame = document.getElementById("overlayFrame");
-  if (frame && frame.contentWindow) {
-    frame.contentWindow.postMessage({ type: "overlay", ...payload }, "*");
-  }
+  frame?.contentWindow?.postMessage(
+    { type: "overlay", user, payload },
+    "*"
+  );
 }
+
+    
+
+async function restoreFromRecords(records, meta = {}) {
+  // ▼ 1. allRecords を更新
+  allRecords = Array.isArray(records) ? records : [];
+  localStorage.setItem("allRecords", JSON.stringify(allRecords));
+
+  // ▼ 2. チーム一覧を再生成
+  state.teams = Array.from(
+    new Set(allRecords.map(r => r.team).filter(Boolean))
+  );
+
+  // ▼ 3. myTeam を復元（優先順位：meta → CSV → IndexedDB → localStorage）
+  if (meta.myTeam) {
+    state.myTeam = meta.myTeam;
+  } else {
+    // CSV に myTeam 列がある場合
+    const first = allRecords.find(r => r.myTeam);
+    if (first) {
+      state.myTeam = first.myTeam;
+    } else {
+      // ▼ IndexedDB から読み込む（ここが重要）
+      const dbMyTeam = await db.get("myTeam");
+      if (dbMyTeam) {
+        state.myTeam = dbMyTeam;
+      } else {
+        // 最後の fallback
+        state.myTeam = localStorage.getItem("myTeam") || "";
+      }
+    }
+  }
+
+  // ▼ 4. myTeam を保存
+  localStorage.setItem("myTeam", state.myTeam);
+  db.put("myTeam", state.myTeam);
+
+  // ▼ 5. UI 更新
+  initTeamAnalysisUI();
+  refreshAllAnalysisViews();
+  renderRaceHistory();
+
+  console.log("restore 完了:", {
+    teams: state.teams,
+    myTeam: state.myTeam
+  });
+}
+
 
 
 
@@ -2162,14 +2667,14 @@ function initTabs() {
     btn.addEventListener("click", () => {
       const tab = btn.dataset.tab;
 
-      // ▼ タブ切り替え
+      // タブ切り替え
       tabs.forEach(b => b.classList.remove("active"));
       btn.classList.add("active");
       contents.forEach(c => {
         c.style.display = (c.id === tab) ? "block" : "none";
       });
 
-      // ▼ ★ 追加：Overlay タブのときだけ body にクラス付与
+      // ★ 追加：Overlay タブのときだけ body にクラス付与
       if (tab === "overlayTab") {
         document.body.classList.add("overlay-mode");
       } else {
@@ -2185,5 +2690,6 @@ window.addEventListener("load", () => {
   setFormatFromMode(state.mode);
   setupJSONDropArea();
   loadLocalHistory();
-  loadWebhookSettings();   // ★ 追加
+  loadWebhookSettings();
+  loadOBSSettings();// ★ 追加
 });
