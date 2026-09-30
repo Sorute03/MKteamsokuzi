@@ -1735,35 +1735,47 @@ async function disconnectOBS() {
  */
 async function sendOverlay() {
   // 1. 各チームのスコア計算
-  const scores = calculateTeamScores(); // 既存の関数を活用
+  let scores = calculateTeamScores(); // 既存の関数を活用
+
+  // 【1R目入力前対応】scores が空、または全チーム揃っていない場合は 0 点で補完
+  if (!scores || Object.keys(scores).length === 0) {
+    scores = {};
+    if (state.teams && Array.isArray(state.teams)) {
+      state.teams.forEach(team => {
+        scores[team] = 0;
+      });
+    }
+  }
 
   // 2. 現在進行中の最大ラウンド数を判定
   let currentRound = 0;
-  for (let r = 0; r < totalRounds; r++) {
-    let hasData = false;
-    for (const team of state.teams) {
-      if (state.teamRanks[team] && state.teamRanks[team][r] && state.teamRanks[team][r].length > 0) {
-        hasData = true;
-        break;
+  if (typeof totalRounds !== "undefined") {
+    for (let r = 0; r < totalRounds; r++) {
+      let hasData = false;
+      for (const team of (state.teams || [])) {
+        if (state.teamRanks && state.teamRanks[team] && state.teamRanks[team][r] && state.teamRanks[team][r].length > 0) {
+          hasData = true;
+          break;
+        }
       }
-    }
-    if (hasData) {
-      currentRound = r + 1; // 1-indexed
+      if (hasData) {
+        currentRound = r + 1; // 1-indexed
+      }
     }
   }
 
   // 3. 送信データの組み立て
   const dataToSend = {
     type: "MKADP_SOKUZI_UPDATE",
-    currentRound: currentRound,
+    currentRound: currentRound, // 1R入力前は 0 になります
     totalRounds: typeof totalRounds !== "undefined" ? totalRounds : 12,
     myTeam: state.myTeam || "自チーム",
-    scores: scores,              // 例: { "チーム1": 150, "チーム2": 120, ... }
-    penalty: state.penalty || {} // ペナルティ点数
+    scores: scores,               // 例: { "チーム1": 0, "チーム2": 0, ... }
+    penalty: state.penalty || {}  // ペナルティ点数
   };
 
   // 4. 別ウィンドウ (window.open で開いた場合) へ送信
-  if (overlayWin && !overlayWin.closed) {
+  if (typeof overlayWin !== "undefined" && overlayWin && !overlayWin.closed) {
     overlayWin.postMessage(dataToSend, "*");
   }
 
@@ -1774,16 +1786,20 @@ async function sendOverlay() {
 
   // 6. OBS WebSocket 経由で送信
   try {
-    if (!obs.socket || obs.socket.readyState !== WebSocket.OPEN) {
-      await connectOBS();
-    }
+    if (typeof obs !== "undefined") {
+      if (!obs.socket || obs.socket.readyState !== WebSocket.OPEN) {
+        if (typeof connectOBS === "function") {
+          await connectOBS();
+        }
+      }
 
-    if (obs.socket && obs.socket.readyState === WebSocket.OPEN) {
-      await obs.call("BroadcastCustomEvent", {
-        vendorName: "mk-sokuzi",
-        eventData: dataToSend
-      });
-      console.log("[送信側] OBS 送信成功:", dataToSend);
+      if (obs.socket && obs.socket.readyState === WebSocket.OPEN) {
+        await obs.call("BroadcastCustomEvent", {
+          vendorName: "mk-sokuzi",
+          eventData: dataToSend
+        });
+        console.log("[送信側] OBS 送信成功:", dataToSend);
+      }
     }
   } catch (e) {
     console.error("[送信側] OBS 送信エラー:", e);
