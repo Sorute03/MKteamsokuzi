@@ -11,24 +11,29 @@
     background: transparent;
     font-family: 'Segoe UI', Meiryo, sans-serif;
     color: white;
+    overflow: hidden; /* スクロールバーを完全に消去 */
   }
 
-  /* 集計表示エリア（横一列バー表示） */
+  /* 集計表示エリア（チーム数に応じて横幅・サイズの自動スケール） */
   #overlayBox {
     position: absolute;
     bottom: 25px;
     left: 50%;
     transform: translateX(-50%); /* 画面中央下部に配置 */
+    transform-origin: bottom center; /* スケール縮小時の基準点を中央下に */
     background: rgba(15, 23, 42, 0.90);
     border: 2px solid rgba(255, 255, 255, 0.15);
     border-radius: 12px;
-    padding: 10px 20px;
+    padding: 8px 16px;
     display: flex;
     align-items: center;
-    gap: 20px;
+    gap: 15px;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
     backdrop-filter: blur(8px);
     white-space: nowrap;
+    max-width: 98vw;
+    box-sizing: border-box;
+    transition: all 0.2s ease;
   }
 
   .header {
@@ -39,9 +44,10 @@
     font-size: 12px;
     font-weight: bold;
     color: #94a3b8;
-    padding-right: 15px;
+    padding-right: 12px;
     border-right: 1px solid rgba(255, 255, 255, 0.2);
     line-height: 1.3;
+    flex-shrink: 0;
   }
 
   /* チーム一覧を横並び（row）に設定 */
@@ -49,16 +55,20 @@
     display: flex;
     flex-direction: row;
     align-items: center;
-    gap: 12px;
+    gap: 8px; /* チーム数に合わせてJSで自動微調整可能 */
+    flex-shrink: 1;
+    overflow: hidden;
   }
 
   .team-row {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 6px 12px;
+    gap: 6px;
+    padding: 6px 10px;
     border-radius: 6px;
     background: rgba(255, 255, 255, 0.05);
+    flex-shrink: 1; /* 枠が狭い場合は柔軟に収まる */
+    min-width: 0;
   }
 
   .team-row.my-team {
@@ -70,31 +80,47 @@
     font-size: 14px;
     font-weight: 800;
     color: #cbd5e1;
+    flex-shrink: 0;
   }
 
   .team-name {
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 600;
-    max-width: 120px;
+    max-width: 110px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
   }
 
   .score-val {
-    font-size: 18px;
+    font-size: 17px;
     font-weight: 800;
     color: #f8fafc;
+    flex-shrink: 0;
   }
 
   .diff-val {
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 700;
+    flex-shrink: 0;
   }
 
   .diff-plus { color: #4ade80; }  /* プラス差分 (緑) */
   .diff-minus { color: #f87171; } /* マイナス差分 (赤) */
   .diff-zero { color: #64748b; }  /* 基準/同点 */
+
+  /* チーム数が多い形式（6人戦/12チーム等）用の自動コンパクトCSSクラス */
+  .compact .team-row {
+    padding: 4px 6px;
+    gap: 4px;
+  }
+  .compact .team-name {
+    max-width: 75px;
+    font-size: 12px;
+  }
+  .compact .rank-badge { font-size: 12px; }
+  .compact .score-val { font-size: 15px; }
+  .compact .diff-val { font-size: 11px; }
 
   /* OBS設定パネル */
   #configBox {
@@ -265,6 +291,34 @@ async function initOBS() {
 }
 
 // ======================================================
+// スケール・サイズ自動調整関数（画面幅からはみ出ない処理）
+// ======================================================
+function adjustScale(teamCount) {
+  const box = document.getElementById("overlayBox");
+  if (!box) return;
+
+  // まずスタイル初期化
+  box.classList.remove("compact");
+  box.style.transform = "translateX(-50%) scale(1)";
+
+  // 6チーム以上（6人戦など）の場合はコンパクトスタイル適用
+  if (teamCount >= 6) {
+    box.classList.add("compact");
+  }
+
+  // それでも画面幅を超える場合は scale で全体を縮小
+  requestAnimationFrame(() => {
+    const windowWidth = window.innerWidth * 0.96; // 96%の幅
+    const boxWidth = box.scrollWidth;
+
+    if (boxWidth > windowWidth) {
+      const scale = windowWidth / boxWidth;
+      box.style.transform = `translateX(-50%) scale(${scale})`;
+    }
+  });
+}
+
+// ======================================================
 // 3. 即時集計（途中経過）描画処理
 // ======================================================
 function renderOverlay(data) {
@@ -323,6 +377,8 @@ function renderOverlay(data) {
         ${teamsHtml}
       </div>
     `;
+
+    adjustScale(sortedRanking.length);
     return;
   }
 
@@ -375,8 +431,19 @@ function renderOverlay(data) {
         ${teamsHtml}
       </div>
     `;
+
+    adjustScale(sortedTeams.length);
   }
 }
+
+// ウィンドウリサイズ時にも拡大率を再計算
+window.addEventListener("resize", () => {
+  const box = document.getElementById("overlayBox");
+  const teamRows = box.querySelectorAll(".team-row");
+  if (teamRows.length > 0) {
+    adjustScale(teamRows.length);
+  }
+});
 
 // 初期化
 window.addEventListener("DOMContentLoaded", () => {
