@@ -120,19 +120,7 @@ const cameraBox      = document.getElementById("cameraBox");
 let autoOcrRunning = false;
 let isCameraStarted = false;
 let isVideoFileLoaded = false;
-
-// Tesseract Workerのインスタンス保持用
-let nameWorker = null;
-let scoreWorker = null;
-
-async function initWorkers() {
-  if (!nameWorker) {
-    nameWorker = await Tesseract.createWorker("jpn+eng");
-  }
-  if (!scoreWorker) {
-    scoreWorker = await Tesseract.createWorker("eng");
-  }
-}
+let isOcrProcessing = false; // 重複実行防止用ロック
 
 /* ソース切り替え */
 sourceType.onchange = () => {
@@ -234,7 +222,6 @@ startCamBtn.onclick = () => {
 (async () => {
   await requestPermission();
   await loadCameras();
-  await initWorkers();
 })();
 
 function renderTeamTagInputs() {
@@ -279,12 +266,10 @@ function preprocessForOCR(video, region) {
   return c;
 }
 
-/* 名前用 OCR（オプション指定を排除しエラーを回避） */
+/* 名前用 OCR（安定版 Tesseract.ize直接呼び出し） */
 async function ocrRegion(video, region) {
   const canvas = preprocessForOCR(video, region);
-  await initWorkers();
-
-  const { data: { text } } = await nameWorker.recognize(canvas);
+  const { data: { text } } = await Tesseract.recognize(canvas, "jpn+eng", { logger: m => {} });
   return normalizeNameChars(text.trim());
 }
 
@@ -413,11 +398,14 @@ async function waitForVideoReady(video) {
 }
 
 runOcrBtn.onclick = async () => {
+  if (isOcrProcessing) return;
+  isOcrProcessing = true;
   await waitForVideoReady(video);
   const count = parseInt(playerCountSel.value);
   const names  = await ocrNames(video, count);
   const scores = await ocrScores(video, count);
   renderPlayerInputs(names, scores);
+  isOcrProcessing = false;
 };
 
 forceRecalcBtn.onclick = () => {
@@ -535,18 +523,24 @@ function checkAndStartOcr() {
   }
 }
 
+/* 自動OCRループ（多重実行防止ロック付き） */
 async function autoOcrLoop() {
   if (!autoOcrRunning) return;
-  await waitForVideoReady(video);
+  
+  if (!isOcrProcessing) {
+    isOcrProcessing = true;
+    await waitForVideoReady(video);
 
-  if (isFinalResultScreen(video)) {
-    const count = parseInt(playerCountSel.value);
-    const names  = await ocrNames(video, count);
-    const scores = await ocrScores(video, count);
-    renderPlayerInputs(names, scores);
-  } else {
-    const scores = await ocrScores(video, 4);
-    renderPlayerInputs(["赤","青","黄","緑"], scores);
+    if (isFinalResultScreen(video)) {
+      const count = parseInt(playerCountSel.value);
+      const names  = await ocrNames(video, count);
+      const scores = await ocrScores(video, count);
+      renderPlayerInputs(names, scores);
+    } else {
+      const scores = await ocrScores(video, 4);
+      renderPlayerInputs(["赤","青","黄","緑"], scores);
+    }
+    isOcrProcessing = false;
   }
 
   if (autoOcrRunning) {
@@ -655,12 +649,10 @@ function preprocessScoreOCR(video, region) {
   return c;
 }
 
-/* スコア用 OCR（オプション指定を排除しエラーを回避） */
+/* スコア用 OCR（安定版 Tesseract.recognize直接呼び出し） */
 async function ocrScoreOnce(video, region) {
   const canvas = preprocessScoreOCR(video, region);
-  await initWorkers();
-
-  const { data: { text } } = await scoreWorker.recognize(canvas);
+  const { data: { text } } = await Tesseract.recognize(canvas, "eng", { logger: m => {} });
   return text.trim();
 }
 
