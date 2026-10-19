@@ -40,7 +40,6 @@ body { margin:0; padding:10px; font-family:sans-serif; }
 table { border-collapse: collapse; margin-top: 10px; width: 100%; }
 th, td { border: 1px solid #aaa; padding: 6px; text-align: center; }
 
-/* OCR & 入力レイアウト統合エリア */
 .ocr-integration-box {
   background: #f9f9f9;
   border: 2px solid #4caf50;
@@ -66,9 +65,9 @@ th, td { border: 1px solid #aaa; padding: 6px; text-align: center; }
 <!-- 入力＆OCR 統合タブ -->
 <div id="inputTab" class="tabContent" style="display:block;">
 
-  <!-- ★ OCR 統合エリア -->
+  <!-- OCR 統合エリア -->
   <div class="ocr-integration-box">
-    <h3>📷 自動OCR入力</h3>
+    <h3>📷 自動OCR入力（3秒間マルチサンプリング対応）</h3>
     <div>
       <label>OCRソース選択:</label>
       <select id="sourceType">
@@ -90,8 +89,8 @@ th, td { border: 1px solid #aaa; padding: 6px; text-align: center; }
         <select id="ocrTargetRound"></select>
       </div>
       <label><input type="checkbox" id="autoAdvanceCheck" checked> 反映後に次ラウンドへ自動切り替え</label>
-      <button onclick="runOcrProcess()" style="font-weight:bold; padding:4px 10px;">今すぐOCR実行</button>
-      <label><input type="checkbox" id="autoOcrCheck"> 自動OCR（2秒毎）</label>
+      <button id="runOcrBtn" onclick="runOcrProcess()" style="font-weight:bold; padding:4px 10px;">今すぐOCR実行（3秒間集約）</button>
+      <label><input type="checkbox" id="autoOcrCheck"> 自動OCR（3秒間隔ループ）</label>
     </div>
 
     <div style="margin-top:10px;">
@@ -466,7 +465,7 @@ function applyPenalty(team) {
 }
 
 /* ============================================================
-   ★ OCR連動（オートラウンド進捗機能付き）
+   ★ OCR連動（3秒間マルチサンプリング対応版）
 ============================================================ */
 const sourceType = document.getElementById("sourceType");
 const fileInput = document.getElementById("fileInput");
@@ -479,6 +478,7 @@ const ocrLog = document.getElementById("ocrLog");
 const ocrTargetRoundSelect = document.getElementById("ocrTargetRound");
 const autoOcrCheck = document.getElementById("autoOcrCheck");
 const autoAdvanceCheck = document.getElementById("autoAdvanceCheck");
+const runOcrBtn = document.getElementById("runOcrBtn");
 
 let loadedImage = null;
 let autoOcrTimer = null;
@@ -527,7 +527,7 @@ function setupOcrSourceUI() {
 
   startCamBtn.onclick = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: cameraSelect.value } } });
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: cameraSelect.value }, width: { ideal: 3840 }, height: { ideal: 2160 } } });
       video.srcObject = stream;
       video.controls = false;
       await video.play();
@@ -536,7 +536,8 @@ function setupOcrSourceUI() {
 
   autoOcrCheck.onchange = () => {
     if (autoOcrCheck.checked) {
-      autoOcrTimer = setInterval(() => { runOcrProcess(); }, 2500);
+      // 3秒間のマルチサンプリングを行うため、インターバルは余裕を持たせて5秒毎に設定
+      autoOcrTimer = setInterval(() => { runOcrProcess(); }, 5000);
     } else {
       stopAutoOcr();
     }
@@ -574,70 +575,95 @@ async function loadCameras() {
   } catch(e) {}
 }
 
+// ★ 3秒間（複数回サンプリング）OCRを実行して結果を集約するメイン関数
 async function runOcrProcess() {
   if (isOcrRunning) return;
   isOcrRunning = true;
+  runOcrBtn.disabled = true;
 
   const targetRound = parseInt(ocrTargetRoundSelect.value);
   const media = (sourceType.value === "image") ? loadedImage : video;
   if (!media) {
     logOcr("メディアソースがありません。");
     isOcrRunning = false;
+    runOcrBtn.disabled = false;
     return;
   }
 
-  let w = media.videoWidth || media.naturalWidth;
-  let h = media.videoHeight || media.naturalHeight;
+  let w = media.videoWidth || media.naturalWidth || media.width;
+  let h = media.videoHeight || media.naturalHeight || media.height;
   if (!w || !h) {
-    logOcr("映像のサイズが取得できません。再生を確認してください。");
+    logOcr("映像サイズ取得失敗。再生を確認してください。");
     isOcrRunning = false;
+    runOcrBtn.disabled = false;
     return;
   }
 
-  logOcr(`OCRスキャン開始 [R${targetRound+1}] (解像度: ${w}x${h})...`);
+  logOcr(`📷 3秒間OCRマルチサンプリング開始 [R${targetRound+1}]...`);
 
   try {
-    const playerCount = 12;
-    const detectedResults = [];
+    const sampleCount = 3; // 3秒間に3回（1秒おき）スキャン
+    const sampleIntervalMs = 1000;
+    const teamVoteMap = {}; // チームごとに検出された順位の票を集計
 
-    for (let i = 0; i < playerCount; i++) {
-      const rowH = h / playerCount;
-      const rankRegion = { x: w * 0.10, y: rowH * i + (rowH * 0.05), width: w * 0.08, height: rowH * 0.9 };
-      const nameRegion = { x: w * 0.19, y: rowH * i + (rowH * 0.05), width: w * 0.40, height: rowH * 0.9 };
+    for (let s = 0; s < sampleCount; s++) {
+      if (s > 0) {
+        await new Promise(r => setTimeout(r, sampleIntervalMs));
+      }
 
-      const rankText = await ocrCropText(media, rankRegion, "eng", "0123456789");
-      const nameText = await ocrCropText(media, nameRegion, "jpn+eng", null);
+      const playerCount = 12;
+      for (let i = 0; i < playerCount; i++) {
+        const rowH = h / playerCount;
+        const rankRegion = { x: w * 0.10, y: rowH * i + (rowH * 0.08), width: w * 0.07, height: rowH * 0.84 };
+        const nameRegion = { x: w * 0.19, y: rowH * i + (rowH * 0.08), width: w * 0.28, height: rowH * 0.84 };
 
-      const rankNum = parseInt(rankText.replace(/\D/g, "")) || (i + 1);
-      const cleanName = nameText.replace(/ /g, " ").trim();
+        const rankText = await ocrCropTextHighQuality(media, rankRegion, "eng", "0123456789");
+        const nameText = await ocrCropTextHighQuality(media, nameRegion, "jpn+eng", null);
 
-      if (cleanName) {
-        detectedResults.push({ rank: rankNum, name: cleanName });
+        const rankNum = parseInt(rankText.replace(/\D/g, "")) || (i + 1);
+        let cleanName = nameText
+          .replace(/ /g, " ")
+          .replace(/\d+点|\d+位|点|位/g, "")
+          .trim();
+
+        if (cleanName) {
+          for (const t of state.teams) {
+            if (!t || t.trim() === "") continue;
+            const tag = t.toLowerCase();
+            const nameLower = cleanName.toLowerCase();
+
+            if (nameLower.startsWith(tag) || nameLower.includes(tag)) {
+              if (!teamVoteMap[t]) teamVoteMap[t] = {};
+              if (!teamVoteMap[t][rankNum]) teamVoteMap[t][rankNum] = 0;
+              teamVoteMap[t][rankNum]++;
+            }
+          }
+        }
       }
     }
 
-    logOcr(`検出成功: ${detectedResults.length}名`);
-
+    // 3秒間の集計結果から最も票数の多かった順位を採用
     let matchCount = 0;
-    detectedResults.forEach(item => {
-      let matchedTeam = null;
-      for (const t of state.teams) {
-        if (item.name.toLowerCase().includes(t.toLowerCase())) {
-          matchedTeam = t;
-          break;
+    Object.entries(teamVoteMap).forEach(([team, ranksObj]) => {
+      let bestRank = null;
+      let maxVotes = 0;
+      Object.entries(ranksObj).forEach(([rank, votes]) => {
+        if (votes > maxVotes) {
+          maxVotes = votes;
+          bestRank = parseInt(rank);
         }
-      }
+      });
 
-      if (matchedTeam) {
+      if (bestRank !== null) {
         matchCount++;
-        logOcr(`✨ R${targetRound+1} ボタン入力: [${matchedTeam}] に ${item.rank}位 (${item.name}) を設定`);
-        autoSelectRankButton(targetRound, matchedTeam, item.rank);
+        logOcr(`✨ 確定 [${team}] -> ${bestRank}位 (投票数: ${maxVotes}/${sampleCount})`);
+        autoSelectRankButton(targetRound, team, bestRank);
       }
     });
 
+    logOcr(`3秒サンプリング完了 (合致チーム数: ${matchCount})`);
     updateScores();
 
-    // ★ 一致があり順位ボタンへの反映が行われた場合、自動で次ラウンドへ移動
     if (matchCount > 0 && autoAdvanceCheck.checked) {
       if (targetRound + 1 < totalRounds) {
         ocrTargetRoundSelect.value = targetRound + 1;
@@ -649,21 +675,25 @@ async function runOcrProcess() {
     logOcr("OCRエラー: " + err.message);
   } finally {
     isOcrRunning = false;
+    runOcrBtn.disabled = false;
   }
 }
 
-async function ocrCropText(media, region, lang, whitelist) {
+async function ocrCropTextHighQuality(media, region, lang, whitelist) {
   const c = document.createElement("canvas");
-  c.width = Math.max(Math.floor(region.width * 3), 50);
-  c.height = Math.max(Math.floor(region.height * 3), 30);
+  c.width = Math.max(Math.floor(region.width * 4), 100);
+  c.height = Math.max(Math.floor(region.height * 4), 60);
   const ctx = c.getContext("2d");
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = "high";
+
   ctx.drawImage(media, region.x, region.y, region.width, region.height, 0, 0, c.width, c.height);
 
   let imgData = ctx.getImageData(0, 0, c.width, c.height);
   let d = imgData.data;
   for (let i = 0; i < d.length; i += 4) {
     let v = (d[i] + d[i+1] + d[i+2]) / 3;
-    let val = v > 160 ? 255 : 0;
+    let val = v > 165 ? 255 : 0;
     d[i] = d[i+1] = d[i+2] = val;
   }
   ctx.putImageData(imgData, 0, 0);
