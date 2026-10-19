@@ -1325,8 +1325,16 @@ function toggleRank(team, round, rank, btn) {
 
 
 function handleButtonKeyDown(e, team, round, rank, btn) {
-  // ① Enter / Space キーで選択・解除
-  if (e.key === "Enter" || e.key === " ") {
+  // ① Enter キーが押されたら、現在バッファにある数字（カンマ区切り含む）を一気に確定して反映する
+  if (e.key === "Enter") {
+    e.preventDefault();
+    clearTimeout(keyBufferTimer);
+    processBufferInput(team, round);
+    return;
+  }
+
+  // Space キーで個別の選択/解除
+  if (e.key === " ") {
     e.preventDefault();
     toggleRank(team, round, rank, btn);
     return;
@@ -1335,6 +1343,12 @@ function handleButtonKeyDown(e, team, round, rank, btn) {
   // ② 矢印キー（↑ ↓ ← →）でフォーカス移動
   if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
     e.preventDefault();
+    
+    // 移動する前に溜まっていた入力があれば一度確定させる
+    if (keyBuffer) {
+      processBufferInput(team, round);
+    }
+
     const currentTeamIdx = parseInt(btn.dataset.teamIndex, 10);
     let targetTeamIdx = currentTeamIdx;
     let targetRank = rank;
@@ -1352,30 +1366,52 @@ function handleButtonKeyDown(e, team, round, rank, btn) {
     return;
   }
 
-  // ③ 数字キー（0〜9）での順位直接指定（2桁入力対応）
-  if (e.key >= "0" && e.key <= "9") {
+  // ③ カンマ（,）または数字（0〜9）での入力処理
+  if (e.key === "," || (e.key >= "0" && e.key <= "9")) {
     e.preventDefault();
+
+    if (e.key === ",") {
+      // カンマが押されたら区切りとしてバッファにカンマを追加
+      keyBuffer += ",";
+      return;
+    }
+
     keyBuffer += e.key;
     
+    // タイムアウトによる自動確定は短め（またはカンマ・Enter確定をメインにするため長め）
     clearTimeout(keyBufferTimer);
     keyBufferTimer = setTimeout(() => {
-      const targetRankNum = parseInt(keyBuffer, 10);
-      keyBuffer = "";
-
-      if (targetRankNum >= 1 && targetRankNum <= 24) {
-        const targetBtn = document.querySelector(
-          `.rank-button[data-team="${team}"][data-round="${round}"][data-rank="${targetRankNum}"]`
-        );
-        if (targetBtn) {
-          toggleRank(team, round, targetRankNum, targetBtn);
-          targetBtn.focus();
-        }
-      }
-    }, 300); // 300ms以内に「1」と「2」を押すと12位になります
+      processBufferInput(team, round);
+    }, 1500); // 1.5秒間操作がないか、Enterが押されるまでバッファ保持
   }
 }
 
+// カンマ区切りの文字列（例: "1,5,12"）を解析して順位に一括反映する関数
+function processBufferInput(team, round) {
+  if (!keyBuffer) return;
+  
+  const rawData = keyBuffer;
+  keyBuffer = ""; // バッファをリセット
 
+  // カンマ区切りで分割して数値化
+  const parts = rawData.split(",");
+
+  parts.forEach(part => {
+    const targetRankNum = parseInt(part.trim(), 10);
+    if (targetRankNum >= 1 && targetRankNum <= 24) {
+      const targetBtn = document.querySelector(
+        `.rank-button[data-team="${team}"][data-round="${round}"][data-rank="${targetRankNum}"]`
+      );
+      if (targetBtn) {
+        const arr = state.teamRanks[team][round];
+        // まだ選択されていない場合のみトグル（選択）する
+        if (!arr.includes(targetRankNum)) {
+          toggleRank(team, round, targetRankNum, targetBtn);
+        }
+      }
+    }
+  });
+}
   
 function autoFillMissingTeam(round) {
   const filled = state.teams.filter(t =>
