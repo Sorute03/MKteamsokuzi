@@ -46,6 +46,11 @@ body.overlay-mode #tabs {
   width:100%; height:120px; border:2px dashed #888; border-radius:10px;
   display:flex; align-items:center; justify-content:center; background:#fafafa;
 }
+/* キーボードフォーカス時の青い枠線 */
+.rank-button:focus {
+  outline: 2px solid #2196F3;
+  border-color: #2196F3;
+}
 </style>
 </head>
 <body>
@@ -348,7 +353,9 @@ body.overlay-mode #tabs {
 ============================================================ */
 // ★ 最重要：state の初期化（これが無いと全部 undefined になる）
 
-
+// キーボード2桁入力用のバッファ
+let keyBuffer = "";
+let keyBufferTimer = null;
   
 const totalRounds = 12;
 const courseList = [
@@ -1253,7 +1260,7 @@ function createTeamInputs() {
     `;
     section.appendChild(header);
 
-    state.teams.forEach(team => {
+    state.teams.forEach((team, teamIndex) => {
       const label = document.createElement("div");
       label.textContent = team;
 
@@ -1264,10 +1271,17 @@ function createTeamInputs() {
         const btn = document.createElement("div");
         btn.className = "rank-button";
         btn.textContent = rank;
+        
+        // ★ キーボード操作対応用の属性とイベントの追加
+        btn.tabIndex = 0; // Tabキーやフォーカス移動を有効化
         btn.dataset.team = team;
+        btn.dataset.teamIndex = teamIndex;
         btn.dataset.round = round;
         btn.dataset.rank = rank;
+        
         btn.onclick = () => toggleRank(team, round, rank, btn);
+        btn.onkeydown = (e) => handleButtonKeyDown(e, team, round, rank, btn);
+
         row.appendChild(btn);
       }
 
@@ -1307,8 +1321,62 @@ function toggleRank(team, round, rank, btn) {
   updateScores();
 }
 
+  
 
 
+function handleButtonKeyDown(e, team, round, rank, btn) {
+  // ① Enter / Space キーで選択・解除
+  if (e.key === "Enter" || e.key === " ") {
+    e.preventDefault();
+    toggleRank(team, round, rank, btn);
+    return;
+  }
+
+  // ② 矢印キー（↑ ↓ ← →）でフォーカス移動
+  if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+    e.preventDefault();
+    const currentTeamIdx = parseInt(btn.dataset.teamIndex, 10);
+    let targetTeamIdx = currentTeamIdx;
+    let targetRank = rank;
+
+    if (e.key === "ArrowLeft") targetRank = Math.max(1, rank - 1);
+    if (e.key === "ArrowRight") targetRank = Math.min(24, rank + 1);
+    if (e.key === "ArrowUp") targetTeamIdx = Math.max(0, currentTeamIdx - 1);
+    if (e.key === "ArrowDown") targetTeamIdx = Math.min(state.teams.length - 1, currentTeamIdx + 1);
+
+    const targetTeam = state.teams[targetTeamIdx];
+    const targetBtn = document.querySelector(
+      `.rank-button[data-team="${targetTeam}"][data-round="${round}"][data-rank="${targetRank}"]`
+    );
+    if (targetBtn) targetBtn.focus();
+    return;
+  }
+
+  // ③ 数字キー（0〜9）での順位直接指定（2桁入力対応）
+  if (e.key >= "0" && e.key <= "9") {
+    e.preventDefault();
+    keyBuffer += e.key;
+    
+    clearTimeout(keyBufferTimer);
+    keyBufferTimer = setTimeout(() => {
+      const targetRankNum = parseInt(keyBuffer, 10);
+      keyBuffer = "";
+
+      if (targetRankNum >= 1 && targetRankNum <= 24) {
+        const targetBtn = document.querySelector(
+          `.rank-button[data-team="${team}"][data-round="${round}"][data-rank="${targetRankNum}"]`
+        );
+        if (targetBtn) {
+          toggleRank(team, round, targetRankNum, targetBtn);
+          targetBtn.focus();
+        }
+      }
+    }, 300); // 300ms以内に「1」と「2」を押すと12位になります
+  }
+}
+
+
+  
 function autoFillMissingTeam(round) {
   const filled = state.teams.filter(t =>
     state.teamRanks[t][round].length === state.teamSizeMap[t]
@@ -3028,6 +3096,9 @@ function initTabs() {
   });
 }
 
+
+
+  
 
 window.addEventListener("load", () => {
   initTabs();
