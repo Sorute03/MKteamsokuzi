@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>MK8DX 即時集計＋補正＋ペナルティ＋teamTag＋表形式UI＋自動OCR</title>
+  <title>マリオカート ワールド 即時集計＋補正＋ペナルティ＋teamTag＋表形式UI＋自動OCR</title>
   <script src="https://unpkg.com/tesseract.js@v4.0.2/dist/tesseract.min.js"></script>
 
   <style>
@@ -119,6 +119,29 @@ const cameraBox      = document.getElementById("cameraBox");
 
 let autoOcrRunning = false;
 
+// Tesseract Workerのインスタンス保持用
+let nameWorker = null;
+let scoreWorker = null;
+
+async function initWorkers() {
+  if (!nameWorker) {
+    nameWorker = await Tesseract.createWorker("jpn+eng");
+    await nameWorker.setParameters({
+      tessedit_char_whitelist: whitelist,
+      psm: 7,
+      oem: 1
+    });
+  }
+  if (!scoreWorker) {
+    scoreWorker = await Tesseract.createWorker("eng");
+    await scoreWorker.setParameters({
+      tessedit_char_whitelist: "0123456789",
+      psm: 7,
+      oem: 1
+    });
+  }
+}
+
 /* ソース切り替え */
 sourceType.onchange = () => {
   if (sourceType.value === "camera") {
@@ -143,15 +166,13 @@ fileInput.onchange = async (e) => {
     const url = URL.createObjectURL(file);
     video.srcObject = null;
     video.src = url;
-    video.controls = true;   // ★ シークバー表示
+    video.controls = true;
     video.play();
   }
 
   if (sourceType.value === "image") {
     const url = URL.createObjectURL(file);
     const img = new Image();
-    img.src = url;
-
     img.onload = () => {
       const c = document.createElement("canvas");
       c.width = img.width;
@@ -161,13 +182,12 @@ fileInput.onchange = async (e) => {
 
       video.srcObject = null;
       video.src = c.toDataURL();
-      video.controls = false; // ★ 画像はコントロール不要
+      video.controls = false;
     };
+    img.src = url;
   }
 };
 
-
-/* 権限取得 */
 async function requestPermission() {
   try {
     await navigator.mediaDevices.getUserMedia({ video: true });
@@ -176,7 +196,6 @@ async function requestPermission() {
   }
 }
 
-/* カメラ一覧 */
 async function loadCameras() {
   const devices = await navigator.mediaDevices.enumerateDevices();
   const cams = devices.filter(d => d.kind === "videoinput");
@@ -190,11 +209,10 @@ async function loadCameras() {
   });
 
   if (cams.length === 0) {
-    alert("カメラが見つかりません。OBS 仮想カメラを起動していますか？");
+    alert("カメラが見つかりません。");
   }
 }
 
-/* カメラ開始 */
 async function startCamera(deviceId) {
   const stream = await navigator.mediaDevices.getUserMedia({
     video: { deviceId: { exact: deviceId } }
@@ -206,17 +224,16 @@ startCamBtn.onclick = () => {
   const id = cameraSelect.value;
   if (id) {
     startCamera(id);
-    video.controls = false; // ★ カメラはシークバー不要
+    video.controls = false;
   }
 };
 
-/* 初期化 */
 (async () => {
   await requestPermission();
   await loadCameras();
+  await initWorkers();
 })();
 
-/* teamTag 自動生成 */
 function renderTeamTagInputs() {
   const mode = formatSel.value;
   const teamSize = parseInt(mode.split("v")[0]);
@@ -233,12 +250,16 @@ function renderTeamTagInputs() {
 formatSel.onchange = renderTeamTagInputs;
 renderTeamTagInputs();
 
-/* OCR前処理 */
+/* マリオカート ワールド向け前処理 */
 function preprocessForOCR(video, region) {
   const c = document.createElement("canvas");
-  c.width = region.width * 3;
-  c.height = region.height * 3;
+  const scale = 3;
+  c.width = region.width * scale;
+  c.height = region.height * scale;
   const ctx = c.getContext("2d");
+
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
 
   ctx.drawImage(
     video,
@@ -247,107 +268,58 @@ function preprocessForOCR(video, region) {
   );
 
   let img = ctx.getImageData(0, 0, c.width, c.height);
-
-  // 白文字抽出
   extractWhiteText(img);
-
-  // 輪郭強調
   edgeEnhance(img);
-
-  // 文字を太くする
   thicken(img);
 
   ctx.putImageData(img, 0, 0);
   return c;
 }
 
-
-/* OCR */
 async function ocrRegion(video, region) {
   const canvas = preprocessForOCR(video, region);
+  await initWorkers();
 
-  const { data: { text } } = await Tesseract.recognize(
-    canvas,
-    "jpn+eng+osd+equ",   // ★ 日本語＋英語＋数字＋記号＋ギリシャ文字
-    {
-      tessedit_char_whitelist: whitelist,
-      psm: 7,
-      oem: 1
-    }
-  );
-
+  const { data: { text } } = await nameWorker.recognize(canvas);
   return normalizeNameChars(text.trim());
 }
 
 const whitelist =
   "0123456789" +
   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz" +
-
-  // 日本語（ひらがな）
   "ぁあぃいぅうぇえぉおかがきぎくぐけげこご" +
   "さざしじすずせぜそぞただちぢつづてでとど" +
   "なにぬねのはばぱひびぴふぶぷへべぺほぼぽ" +
   "まみむめもやゆよらりるれろわをん" +
-
-  // 日本語（カタカナ）
   "ァアィイゥウェエォオカガキギクグケゲコゴ" +
   "サザシジスズセゼソゾタダチヂツヅテデトド" +
   "ナニヌネノハバパヒビピフブプヘベペホボポ" +
   "マミムメモヤユヨラリルレロワヲン" +
-
-  // ギリシャ文字（小文字）
   "αβγδεζηθικλμνξοπρστυφχψω" +
-
-  // ギリシャ文字（大文字）
   "ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩ" +
-
-  // 記号
-  "!?" +
-  "★☆+-_[](){}<>/\\|" +
-
-  // 伸ばし棒（全種類）
+  "!?★☆+-_[](){}<>/\\|" +
   "ー－―—ｰ‐-" +
-
-  // スペース（半角・全角）
-  " " +
-  "　";
+  "  ";
 
 function normalizeNameChars(name) {
   return name
-    // スペース
-    .replace(/　/g, " ")   // 全角スペース → 半角
-
-    // 記号（全角 → 半角）
+    .replace(/ /g, " ")
     .replace(/！/g, "!")
     .replace(/？/g, "?")
-
-    // 伸ばし棒を全部 "-" に統一
     .replace(/ー|－|―|—|ｰ|‐/g, "-")
-
     .trim();
 }
 
-  
-
 function correctNameForTeamTag(name, teamTags) {
   const normalized = normalizeNameChars(name);
-
-  // タグが先頭にあるかチェック
   for (const tag of teamTags) {
-    if (normalized.startsWith(tag)) {
-      return normalized;
-    }
+    if (normalized.startsWith(tag)) return normalized;
   }
 
-  // タグ欠損 → 最も近いタグを補完
   let bestTag = null;
   let bestScore = Infinity;
-
   for (const tag of teamTags) {
-    const score = levenshtein(
-      normalized.slice(0, tag.length).toLowerCase(),
-      tag.toLowerCase()
-    );
+    const score = levenshtein(normalized.slice(0, tag.length).toLowerCase(), tag.toLowerCase());
     if (score < bestScore) {
       bestScore = score;
       bestTag = tag;
@@ -357,41 +329,35 @@ function correctNameForTeamTag(name, teamTags) {
   if (bestScore <= 1) {
     return bestTag + normalized;
   }
-
   return normalized;
 }
 
-
 function levenshtein(a, b) {
-  const dp = Array(a.length + 1).fill(null)
-    .map(() => Array(b.length + 1).fill(0));
-
+  const dp = Array(a.length + 1).fill(null).map(() => Array(b.length + 1).fill(0));
   for (let i = 0; i <= a.length; i++) dp[i][0] = i;
   for (let j = 0; j <= b.length; j++) dp[0][j] = j;
 
   for (let i = 1; i <= a.length; i++) {
     for (let j = 1; j <= b.length; j++) {
       const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      dp[i][j] = Math.min(
-        dp[i - 1][j] + 1,
-        dp[i][j - 1] + 1,
-        dp[i - 1][j - 1] + cost
-      );
+      dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost);
     }
   }
   return dp[a.length][b.length];
 }
 
-
-/* OCR領域計算 */
+/* 
+  ★ マリオカート ワールド向け座標調整 
+  Switch 2ベースのUI配置（横長画面・リストの余白）に合わせ、名前とスコアの取得位置を微調整
+*/
 function calcNameRegion(i, vw, vh) {
   const count = parseInt(playerCountSel.value);
   const rowHeight = vh / count;
   return {
-    x: vw * 0.18,
-    y: rowHeight * i,
-    width: vw * 0.32,
-    height: rowHeight
+    x: vw * 0.20,       // ワールドのUIに合わせて微調整
+    y: rowHeight * i + (rowHeight * 0.1),
+    width: vw * 0.30,
+    height: rowHeight * 0.8
   };
 }
 
@@ -399,39 +365,31 @@ function calcScoreRegion(i, vw, vh) {
   const count = parseInt(playerCountSel.value);
   const rowHeight = vh / count;
   return {
-    x: vw * 0.63,
-    y: rowHeight * i,
-    width: vw * 0.10,
-    height: rowHeight
+    x: vw * 0.65,       // スコア表示位置の調整
+    y: rowHeight * i + (rowHeight * 0.1),
+    width: vw * 0.08,
+    height: rowHeight * 0.8
   };
 }
 
-/* 名前・点数 OCR */
 async function ocrNames(video, count) {
   if (!isFinalResultScreen(video)) {
-    return Array(count).fill(""); // 途中経過では名前OCRしない
+    return Array(count).fill("");
   }
 
   const names = [];
   const vw = video.videoWidth;
   const vh = video.videoHeight;
-
-  const teamTags = [...document.querySelectorAll(".teamTagInput")]
-    .map(i => i.value.trim())
-    .filter(Boolean);
+  const teamTags = [...document.querySelectorAll(".teamTagInput")].map(i => i.value.trim()).filter(Boolean);
 
   for (let i = 0; i < count; i++) {
     const region = calcNameRegion(i, vw, vh);
     let text = await ocrRegion(video, region);
-
     text = correctNameForTeamTag(text, teamTags);
-
     names.push(text);
   }
   return names;
 }
-
-
 
 async function ocrScores(video, count) {
   const scores = [];
@@ -446,8 +404,6 @@ async function ocrScores(video, count) {
   return scores;
 }
 
-
-/* 表UI生成 */
 function renderPlayerInputs(names, scores) {
   const tbody = document.getElementById("playerTableBody");
   tbody.innerHTML = "";
@@ -463,7 +419,6 @@ function renderPlayerInputs(names, scores) {
   });
 }
 
-/* video準備待ち */
 async function waitForVideoReady(video) {
   return new Promise(resolve => {
     if (video.readyState >= 2 && video.videoWidth > 0) {
@@ -474,7 +429,6 @@ async function waitForVideoReady(video) {
   });
 }
 
-/* 手動OCR */
 runOcrBtn.onclick = async () => {
   await waitForVideoReady(video);
   const count = parseInt(playerCountSel.value);
@@ -483,7 +437,6 @@ runOcrBtn.onclick = async () => {
   renderPlayerInputs(names, scores);
 };
 
-/* 再集計 */
 forceRecalcBtn.onclick = () => {
   const rows = document.querySelectorAll("#playerTableBody tr");
   const names = [];
@@ -498,15 +451,11 @@ forceRecalcBtn.onclick = () => {
     finalScores.push(score + bonus - penalty);
   });
 
-  const teamTags = [...document.querySelectorAll(".teamTagInput")]
-    .map(i => i.value.trim())
-    .filter(Boolean);
-
+  const teamTags = [...document.querySelectorAll(".teamTagInput")].map(i => i.value.trim()).filter(Boolean);
   const teams = buildTeams(names, finalScores, teamTags);
   resultPre.textContent = JSON.stringify(teams, null, 2);
 };
 
-/* チーム分け */
 function buildTeams(names, scores, teamTags) {
   const teams = {};
   teamTags.forEach(tag => {
@@ -523,16 +472,17 @@ function buildTeams(names, scores, teamTags) {
   return teams;
 }
 
-/* 最終リザルト判定 */
+/* マリオカート ワールドのリザルト画面判定の調整 */
 function detectFinalResultText(video) {
   const c = document.createElement("canvas");
   c.width = 300;
   c.height = 120;
   const ctx = c.getContext("2d");
 
+  // ワールドのリザルトロゴや上部タイトルの位置に合わせる
   ctx.drawImage(
     video,
-    video.videoWidth * 0.25, video.videoHeight * 0.05,
+    video.videoWidth * 0.25, video.videoHeight * 0.04,
     video.videoWidth * 0.5, video.videoHeight * 0.15,
     0, 0, c.width, c.height
   );
@@ -543,9 +493,9 @@ function detectFinalResultText(video) {
   let whiteCount = 0;
   for (let i = 0; i < data.length; i += 4) {
     const v = (data[i] + data[i+1] + data[i+2]) / 3;
-    if (v > 220) whiteCount++;
+    if (v > 210) whiteCount++;
   }
-  return whiteCount > 2000;
+  return whiteCount > 1800;
 }
 
 function isTeamBattle() {
@@ -561,8 +511,8 @@ function detectTeamColorPanels(video) {
 
   ctx.drawImage(
     video,
-    video.videoWidth * 0.60, video.videoHeight * 0.20,
-    video.videoWidth * 0.35, video.videoHeight * 0.60,
+    video.videoWidth * 0.55, video.videoHeight * 0.15,
+    video.videoWidth * 0.40, video.videoHeight * 0.65,
     0, 0, c.width, c.height
   );
 
@@ -590,38 +540,29 @@ function isFinalResultScreen(video) {
   }
 }
 
-/* 自動OCRループ */
 async function autoOcrLoop() {
   if (!autoOcrRunning) return;
-
   await waitForVideoReady(video);
 
   if (isFinalResultScreen(video)) {
-    // 最終リザルト → 名前＋点数
     const count = parseInt(playerCountSel.value);
     const names  = await ocrNames(video, count);
     const scores = await ocrScores(video, count);
     renderPlayerInputs(names, scores);
   } else {
-    // 途中結果 → 点数だけ
-    const scores = await ocrScores(video, 4); // 赤青黄緑の4チーム
+    const scores = await ocrScores(video, 4);
     renderPlayerInputs(["赤","青","黄","緑"], scores);
   }
 
   requestAnimationFrame(autoOcrLoop);
 }
 
-
-
-// 白文字抽出（MK8DX専用）
 function extractWhiteText(imgData) {
   const data = imgData.data;
   for (let i = 0; i < data.length; i += 4) {
     const r = data[i], g = data[i+1], b = data[i+2];
     const brightness = (r + g + b) / 3;
-
-    // 白文字だけ残す
-    if (brightness > 200) {
+    if (brightness > 190) {
       data[i] = data[i+1] = data[i+2] = 255;
     } else {
       data[i] = data[i+1] = data[i+2] = 0;
@@ -634,31 +575,21 @@ function edgeEnhance(img) {
   const w = img.width;
   const h = img.height;
 
-  // 簡易エッジ強調（隣のピクセルとの差分を取る）
   for (let y = 1; y < h - 1; y++) {
     for (let x = 1; x < w - 1; x++) {
       const i = (y * w + x) * 4;
+      const v = data[i];
+      const vL = data[i - 4];
+      const vR = data[i + 4];
+      const vU = data[i - w * 4];
+      const vD = data[i + w * 4];
 
-      const v = data[i]; // 現在の明度（白黒前提）
-
-      const vL = data[i - 4];       // 左
-      const vR = data[i + 4];       // 右
-      const vU = data[i - w * 4];   // 上
-      const vD = data[i + w * 4];   // 下
-
-      const edge = Math.abs(v - vL) +
-                   Math.abs(v - vR) +
-                   Math.abs(v - vU) +
-                   Math.abs(v - vD);
-
-      const out = edge > 50 ? 255 : 0;
-
+      const edge = Math.abs(v - vL) + Math.abs(v - vR) + Math.abs(v - vU) + Math.abs(v - vD);
+      const out = edge > 40 ? 255 : 0;
       data[i] = data[i+1] = data[i+2] = out;
     }
   }
 }
-
-
 
 function thicken(imgData) {
   const w = imgData.width;
@@ -680,32 +611,29 @@ function thicken(imgData) {
       dst[i+3] = 255;
     }
   }
-
   imgData.data.set(dst);
 }
-
 
 async function ocrScoreRegion(video, region) {
   const a = await ocrScoreOnce(video, region);
   const b = await ocrScoreOnce(video, region);
 
   if (a === b && a !== "") return a;
-
-  // どちらかが数字ならそれを採用
   if (/^\d+$/.test(a)) return a;
   if (/^\d+$/.test(b)) return b;
 
-  // どちらも数字でない → 補正へ
   return correctScore(a, b);
 }
 
-
-
 function preprocessScoreOCR(video, region) {
   const c = document.createElement("canvas");
-  c.width = region.width * 3;
-  c.height = region.height * 3;
+  const scale = 3;
+  c.width = region.width * scale;
+  c.height = region.height * scale;
   const ctx = c.getContext("2d");
+
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
 
   ctx.drawImage(
     video,
@@ -719,13 +647,9 @@ function preprocessScoreOCR(video, region) {
   for (let i = 0; i < data.length; i += 4) {
     const r = data[i], g = data[i+1], b = data[i+2];
     const v = (r + g + b) / 3;
-
-    // ★ 黒文字抽出（黒→白、白→黒）
-    if (v < 100) {
-      // 黒文字 → 白にする
+    if (v < 120) {
       data[i] = data[i+1] = data[i+2] = 255;
     } else {
-      // 背景 → 黒にする
       data[i] = data[i+1] = data[i+2] = 0;
     }
   }
@@ -734,45 +658,27 @@ function preprocessScoreOCR(video, region) {
   return c;
 }
 
-
 async function ocrScoreOnce(video, region) {
   const canvas = preprocessScoreOCR(video, region);
+  await initWorkers();
 
-  const { data: { text } } = await Tesseract.recognize(
-    canvas,
-    "jpn",
-    {
-      tessedit_char_whitelist: "0123456789",
-      psm: 7,
-      oem: 1
-    }
-  );
-
+  const { data: { text } } = await scoreWorker.recognize(canvas);
   return text.trim();
 }
 
-
-
 function correctScore(a, b) {
   const candidates = [];
-
   [a, b].forEach(v => {
     if (!v) return;
-
-    // 数字以外除去
     v = v.replace(/\D/g, "");
-
     if (v.length === 0) return;
 
     let num = parseInt(v);
-
-    // 0〜180 の数字だけ採用
     if (num >= 0 && num <= 180) {
       candidates.push(num);
       return;
     }
 
-    // 180 を超える場合 → 末尾の 0 を削る（例：1800 → 180）
     while (num > 180 && v.length > 1) {
       v = v.slice(0, -1);
       num = parseInt(v);
@@ -783,35 +689,11 @@ function correctScore(a, b) {
     }
   });
 
-  // 候補があれば最大値を返す
   if (candidates.length > 0) {
     return Math.max(...candidates).toString();
   }
-
-  // それでも取れない → 0扱い
   return "0";
 }
-
-function levenshtein(a, b) {
-  const dp = Array(a.length + 1).fill(null)
-    .map(() => Array(b.length + 1).fill(0));
-
-  for (let i = 0; i <= a.length; i++) dp[i][0] = i;
-  for (let j = 0; j <= b.length; j++) dp[0][j] = j;
-
-  for (let i = 1; i <= a.length; i++) {
-    for (let j = 1; j <= b.length; j++) {
-      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      dp[i][j] = Math.min(
-        dp[i - 1][j] + 1,
-        dp[i][j - 1] + 1,
-        dp[i - 1][j - 1] + cost
-      );
-    }
-  }
-  return dp[a.length][b.length];
-}
-
 </script>
 </body>
 </html>
