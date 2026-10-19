@@ -1390,7 +1390,46 @@ function processBufferInput(team, round) {
     }
   });
 }
-  
+
+
+/* ============================================================
+   順位の選択・解除を処理するメイン関数
+============================================================ */
+function toggleRank(team, round, rank, btn) {
+  // state.teamRanks が未初期化の場合は初期化
+  if (!state.teamRanks) state.teamRanks = {};
+  if (!state.teamRanks[team]) state.teamRanks[team] = {};
+  if (!state.teamRanks[team][round]) state.teamRanks[team][round] = [];
+
+  const arr = state.teamRanks[team][round];
+  const idx = arr.indexOf(rank);
+
+  // ① すでに選択済みの場合は解除
+  if (idx >= 0) {
+    arr.splice(idx, 1);
+    if (btn) btn.classList.remove("selected");
+    updateScores();
+    return;
+  }
+
+  // ② 未選択の場合はチームの人数制限をチェックして追加
+  const need = (state.teamSizeMap && state.teamSizeMap[team]) || 6; // デフォルト人数制限
+  if (arr.length < need) {
+    arr.push(rank);
+    if (btn) btn.classList.add("selected");
+  } else {
+    alert(`${team} は最大 ${need} 人です`);
+    return;
+  }
+
+  // ③ 自動補完やスコア更新
+  if (typeof autoFillMissingTeam === "function") {
+    autoFillMissingTeam(round);
+  }
+  if (typeof updateScores === "function") {
+    updateScores();
+  }
+}
 
 
 function handleButtonKeyDown(e, team, round, rank, btn) {
