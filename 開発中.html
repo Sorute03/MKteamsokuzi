@@ -279,32 +279,12 @@ function preprocessForOCR(video, region) {
   return c;
 }
 
-const whitelist =
-  "0123456789" +
-  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz" +
-  "ぁあぃいぅうぇえぉおかがきぎくぐけげこご" +
-  "さざしじすずせぜそぞただちぢつづてでとど" +
-  "なにぬねのはばぱひびぴふぶぷへべぺほぼぽ" +
-  "まみむめもやゆよらりるれろわをん" +
-  "ァアィイゥウェエォオカガキギクグケゲコゴ" +
-  "サザシジスズセゼソゾタダチヂツヅテデトド" +
-  "ナニヌネノハバパヒビピフブプヘベペホボポ" +
-  "マミムメモヤユヨラリルレロワヲン" +
-  "αβγδεζηθικλμνξοπρστυφχψω" +
-  "ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩ" +
-  "!?★☆+-_[](){}<>/\\|" +
-  "ー－―—ｰ‐-" +
-  "  ";
-
-/* 名前用 OCR（recognize時にパラメータを直接指定） */
+/* 名前用 OCR（オプション指定を排除しエラーを回避） */
 async function ocrRegion(video, region) {
   const canvas = preprocessForOCR(video, region);
   await initWorkers();
 
-  const { data: { text } } = await nameWorker.recognize(canvas, {
-    tessedit_char_whitelist: whitelist,
-    psm: 7
-  });
+  const { data: { text } } = await nameWorker.recognize(canvas);
   return normalizeNameChars(text.trim());
 }
 
@@ -675,15 +655,12 @@ function preprocessScoreOCR(video, region) {
   return c;
 }
 
-/* スコア用 OCR（recognize時にパラメータを直接指定） */
+/* スコア用 OCR（オプション指定を排除しエラーを回避） */
 async function ocrScoreOnce(video, region) {
   const canvas = preprocessScoreOCR(video, region);
   await initWorkers();
 
-  const { data: { text } } = await scoreWorker.recognize(canvas, {
-    tessedit_char_whitelist: "0123456789",
-    psm: 7
-  });
+  const { data: { text } } = await scoreWorker.recognize(canvas);
   return text.trim();
 }
 
