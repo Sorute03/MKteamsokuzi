@@ -128,19 +128,9 @@ let scoreWorker = null;
 async function initWorkers() {
   if (!nameWorker) {
     nameWorker = await Tesseract.createWorker("jpn+eng");
-    await nameWorker.setParameters({
-      tessedit_char_whitelist: whitelist,
-      psm: 7,
-      oem: 1
-    });
   }
   if (!scoreWorker) {
     scoreWorker = await Tesseract.createWorker("eng");
-    await scoreWorker.setParameters({
-      tessedit_char_whitelist: "0123456789",
-      psm: 7,
-      oem: 1
-    });
   }
 }
 
@@ -157,7 +147,6 @@ sourceType.onchange = () => {
     isCameraStarted = false;
     checkAndStartOcr();
   } else {
-    // 画像ファイルモード
     cameraBox.style.display = "none";
     fileInput.style.display = "inline-block";
     isCameraStarted = false;
@@ -264,7 +253,7 @@ function renderTeamTagInputs() {
 formatSel.onchange = renderTeamTagInputs;
 renderTeamTagInputs();
 
-/* OCR前処理 */
+/* 前処理 */
 function preprocessForOCR(video, region) {
   const c = document.createElement("canvas");
   const scale = 3;
@@ -290,14 +279,6 @@ function preprocessForOCR(video, region) {
   return c;
 }
 
-async function ocrRegion(video, region) {
-  const canvas = preprocessForOCR(video, region);
-  await initWorkers();
-
-  const { data: { text } } = await nameWorker.recognize(canvas);
-  return normalizeNameChars(text.trim());
-}
-
 const whitelist =
   "0123456789" +
   "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz" +
@@ -314,6 +295,18 @@ const whitelist =
   "!?★☆+-_[](){}<>/\\|" +
   "ー－―—ｰ‐-" +
   "  ";
+
+/* 名前用 OCR（recognize時にパラメータを直接指定） */
+async function ocrRegion(video, region) {
+  const canvas = preprocessForOCR(video, region);
+  await initWorkers();
+
+  const { data: { text } } = await nameWorker.recognize(canvas, {
+    tessedit_char_whitelist: whitelist,
+    psm: 7
+  });
+  return normalizeNameChars(text.trim());
+}
 
 function normalizeNameChars(name) {
   return name
@@ -548,7 +541,6 @@ function isFinalResultScreen(video) {
   }
 }
 
-/* 常に条件を判定してOCRループを起動する関数 */
 function checkAndStartOcr() {
   const isCameraModeActive = (sourceType.value === "camera" && isCameraStarted);
   const isVideoModeActive = (sourceType.value === "video" && isVideoFileLoaded);
@@ -563,7 +555,6 @@ function checkAndStartOcr() {
   }
 }
 
-/* 自動OCRループ */
 async function autoOcrLoop() {
   if (!autoOcrRunning) return;
   await waitForVideoReady(video);
@@ -684,11 +675,15 @@ function preprocessScoreOCR(video, region) {
   return c;
 }
 
+/* スコア用 OCR（recognize時にパラメータを直接指定） */
 async function ocrScoreOnce(video, region) {
   const canvas = preprocessScoreOCR(video, region);
   await initWorkers();
 
-  const { data: { text } } = await scoreWorker.recognize(canvas);
+  const { data: { text } } = await scoreWorker.recognize(canvas, {
+    tessedit_char_whitelist: "0123456789",
+    psm: 7
+  });
   return text.trim();
 }
 
