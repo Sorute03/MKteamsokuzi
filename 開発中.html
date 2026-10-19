@@ -118,6 +118,8 @@ const fileInput      = document.getElementById("fileInput");
 const cameraBox      = document.getElementById("cameraBox");
 
 let autoOcrRunning = false;
+let isCameraStarted = false;
+let isVideoFileLoaded = false;
 
 // Tesseract Workerのインスタンス保持用
 let nameWorker = null;
@@ -147,13 +149,20 @@ sourceType.onchange = () => {
   if (sourceType.value === "camera") {
     fileInput.style.display = "none";
     cameraBox.style.display = "block";
-    autoOcrRunning = true;
-    autoOcrLoop();
-  } else {
+    isVideoFileLoaded = false;
+    checkAndStartOcr();
+  } else if (sourceType.value === "video") {
     cameraBox.style.display = "none";
     fileInput.style.display = "inline-block";
-    autoOcrRunning = (sourceType.value === "video");
-    if (autoOcrRunning) autoOcrLoop();
+    isCameraStarted = false;
+    checkAndStartOcr();
+  } else {
+    // 画像ファイルモード
+    cameraBox.style.display = "none";
+    fileInput.style.display = "inline-block";
+    isCameraStarted = false;
+    isVideoFileLoaded = false;
+    autoOcrRunning = false;
   }
 };
 
@@ -168,9 +177,12 @@ fileInput.onchange = async (e) => {
     video.src = url;
     video.controls = true;
     video.play();
+    isVideoFileLoaded = true;
+    checkAndStartOcr();
   }
 
   if (sourceType.value === "image") {
+    isVideoFileLoaded = false;
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
@@ -218,6 +230,8 @@ async function startCamera(deviceId) {
     video: { deviceId: { exact: deviceId } }
   });
   video.srcObject = stream;
+  isCameraStarted = true;
+  checkAndStartOcr();
 }
 
 startCamBtn.onclick = () => {
@@ -250,7 +264,7 @@ function renderTeamTagInputs() {
 formatSel.onchange = renderTeamTagInputs;
 renderTeamTagInputs();
 
-/* マリオカート ワールド向け前処理 */
+/* OCR前処理 */
 function preprocessForOCR(video, region) {
   const c = document.createElement("canvas");
   const scale = 3;
@@ -346,15 +360,11 @@ function levenshtein(a, b) {
   return dp[a.length][b.length];
 }
 
-/* 
-  ★ マリオカート ワールド向け座標調整 
-  Switch 2ベースのUI配置（横長画面・リストの余白）に合わせ、名前とスコアの取得位置を微調整
-*/
 function calcNameRegion(i, vw, vh) {
   const count = parseInt(playerCountSel.value);
   const rowHeight = vh / count;
   return {
-    x: vw * 0.20,       // ワールドのUIに合わせて微調整
+    x: vw * 0.20,
     y: rowHeight * i + (rowHeight * 0.1),
     width: vw * 0.30,
     height: rowHeight * 0.8
@@ -365,7 +375,7 @@ function calcScoreRegion(i, vw, vh) {
   const count = parseInt(playerCountSel.value);
   const rowHeight = vh / count;
   return {
-    x: vw * 0.65,       // スコア表示位置の調整
+    x: vw * 0.65,
     y: rowHeight * i + (rowHeight * 0.1),
     width: vw * 0.08,
     height: rowHeight * 0.8
@@ -472,14 +482,12 @@ function buildTeams(names, scores, teamTags) {
   return teams;
 }
 
-/* マリオカート ワールドのリザルト画面判定の調整 */
 function detectFinalResultText(video) {
   const c = document.createElement("canvas");
   c.width = 300;
   c.height = 120;
   const ctx = c.getContext("2d");
 
-  // ワールドのリザルトロゴや上部タイトルの位置に合わせる
   ctx.drawImage(
     video,
     video.videoWidth * 0.25, video.videoHeight * 0.04,
@@ -540,6 +548,22 @@ function isFinalResultScreen(video) {
   }
 }
 
+/* 常に条件を判定してOCRループを起動する関数 */
+function checkAndStartOcr() {
+  const isCameraModeActive = (sourceType.value === "camera" && isCameraStarted);
+  const isVideoModeActive = (sourceType.value === "video" && isVideoFileLoaded);
+
+  if (isCameraModeActive || isVideoModeActive) {
+    if (!autoOcrRunning) {
+      autoOcrRunning = true;
+      autoOcrLoop();
+    }
+  } else {
+    autoOcrRunning = false;
+  }
+}
+
+/* 自動OCRループ */
 async function autoOcrLoop() {
   if (!autoOcrRunning) return;
   await waitForVideoReady(video);
@@ -554,7 +578,9 @@ async function autoOcrLoop() {
     renderPlayerInputs(["赤","青","黄","緑"], scores);
   }
 
-  requestAnimationFrame(autoOcrLoop);
+  if (autoOcrRunning) {
+    requestAnimationFrame(autoOcrLoop);
+  }
 }
 
 function extractWhiteText(imgData) {
