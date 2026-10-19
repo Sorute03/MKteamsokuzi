@@ -266,7 +266,6 @@ function preprocessForOCR(video, region) {
   return c;
 }
 
-/* 名前用 OCR */
 async function ocrRegion(video, region) {
   const canvas = preprocessForOCR(video, region);
   const { data: { text } } = await Tesseract.recognize(canvas, "jpn+eng", { logger: m => {} });
@@ -445,35 +444,6 @@ function buildTeams(names, scores, teamTags) {
   return teams;
 }
 
-function detectFinalResultText(video) {
-  const c = document.createElement("canvas");
-  c.width = 300;
-  c.height = 120;
-  const ctx = c.getContext("2d");
-
-  ctx.drawImage(
-    video,
-    video.videoWidth * 0.25, video.videoHeight * 0.04,
-    video.videoWidth * 0.5, video.videoHeight * 0.15,
-    0, 0, c.width, c.height
-  );
-
-  const img = ctx.getImageData(0, 0, c.width, c.height);
-  const data = img.data;
-
-  let whiteCount = 0;
-  for (let i = 0; i < data.length; i += 4) {
-    const v = (data[i] + data[i+1] + data[i+2]) / 3;
-    if (v > 210) whiteCount++;
-  }
-  return whiteCount > 1800;
-}
-
-/* 色判定が取れなくても、リザルト画面のテキスト（ロゴ等）が検知できればOCRを通すように緩和 */
-function isFinalResultScreen(video) {
-  return detectFinalResultText(video);
-}
-
 function checkAndStartOcr() {
   const isCameraModeActive = (sourceType.value === "camera" && isCameraStarted);
   const isVideoModeActive = (sourceType.value === "video" && isVideoFileLoaded);
@@ -488,6 +458,7 @@ function checkAndStartOcr() {
   }
 }
 
+/* ★ 判定を排除し、有効な動画・カメラ映像であれば常に自動OCRを実行するように修正 */
 async function autoOcrLoop() {
   if (!autoOcrRunning) return;
   
@@ -495,17 +466,19 @@ async function autoOcrLoop() {
     isOcrProcessing = true;
     await waitForVideoReady(video);
 
-    if (isFinalResultScreen(video)) {
-      const count = parseInt(playerCountSel.value);
-      const names  = await ocrNames(video, count);
-      const scores = await ocrScores(video, count);
-      renderPlayerInputs(names, scores);
-    }
+    const count = parseInt(playerCountSel.value);
+    const names  = await ocrNames(video, count);
+    const scores = await ocrScores(video, count);
+    renderPlayerInputs(names, scores);
+
     isOcrProcessing = false;
   }
 
+  // 実行頻度を適度に調整（高負荷を防ぐため少しインターバルを挟むことも可能ですが、ループを継続）
   if (autoOcrRunning) {
-    requestAnimationFrame(autoOcrLoop);
+    setTimeout(() => {
+      requestAnimationFrame(autoOcrLoop);
+    }, 1000); // 1秒ごとに自動でOCRを走らせる
   }
 }
 
