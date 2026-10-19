@@ -1,43 +1,125 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <title>マリオカート ワールド 即時集計＋補正＋ペナルティ＋teamTag＋表形式UI＋自動OCR</title>
-  <script src="https://unpkg.com/tesseract.js@v4.0.2/dist/tesseract.min.js"></script>
-
-  <style>
-    table {
-      border-collapse: collapse;
-      margin-top: 10px;
-    }
-    th, td {
-      border: 1px solid #aaa;
-      padding: 4px 6px;
-    }
-    input {
-      width: 120px;
-    }
-    input.name {
-      width: 200px;
-    }
-    .teamTagInput {
-      margin-right: 6px;
-      margin-bottom: 4px;
-    }
-    #cam, #imagePreview {
-      max-width: 100%;
-      height: auto;
-      display: block;
-      margin-top: 10px;
-    }
-  </style>
+<meta charset="UTF-8">
+<title>MKteamsokuzi ＋ 自動OCR連動</title>
+<script src="https://unpkg.com/obs-websocket-js"></script>
+<script src="https://unpkg.com/tesseract.js@v4.0.2/dist/tesseract.min.js"></script>
+<style>
+body { margin:0; padding:10px; font-family:sans-serif; }
+#tabs {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  background: rgba(0,0,0,0.8);
+  padding: 6px;
+  z-index: 100;
+}
+.tabBtn { padding:6px 12px; border:1px solid #ccc; background:#f5f5f5; cursor:pointer; }
+.tabBtn.active { background:#4caf50; color:#fff; }
+.tabContent { margin-top:50px; }
+.team-section { margin-bottom:20px; border:1px solid #ddd; padding:10px; border-radius:6px; }
+.rank-buttons { display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; }
+.rank-button {
+  width:32px; height:32px; text-align:center; line-height:32px;
+  border:1px solid #ccc; cursor:pointer; border-radius:4px; font-size:12px; background:#fff;
+}
+.rank-button.selected { background:#4caf50; color:white; font-weight:bold; }
+#penaltyModal {
+  display:none; position:fixed; top:50%; left:50%;
+  transform:translate(-50%,-50%); background:white;
+  padding:20px; border:2px solid #333; border-radius:10px; z-index:9999; box-shadow:0 4px 10px rgba(0,0,0,0.3);
+}
+.record { border:1px solid #ccc; padding:6px; margin:4px 0; font-size:12px; }
+#jsonDropArea {
+  width:100%; height:120px; border:2px dashed #888; border-radius:10px;
+  display:flex; align-items:center; justify-content:center; background:#fafafa;
+}
+table { border-collapse: collapse; margin-top: 10px; width: 100%; }
+th, td { border: 1px solid #aaa; padding: 6px; text-align: center; }
+</style>
 </head>
-
 <body>
 
-  <!-- OCRソース選択 -->
+<!-- タブ -->
+<div id="tabs">
+  <button class="tabBtn active" data-tab="inputTab" onclick="showTab('inputTab')">入力</button>
+  <button class="tabBtn" data-tab="ocrTab" onclick="showTab('ocrTab')">OCR連動</button>
+  <button class="tabBtn" data-tab="analysisTab" onclick="showTab('analysisTab')">戦績</button>
+  <button class="tabBtn" data-tab="historyTab" onclick="showTab('historyTab')">歴代戦績</button>
+  <button class="tabBtn" data-tab="jsonTab" onclick="showTab('jsonTab')">JSON</button>
+  <button class="tabBtn" data-tab="p2pTab" onclick="showTab('p2pTab')">P2P</button>
+  <button class="tabBtn" data-tab="resultTab" onclick="showTab('resultTab')">リザルト</button>
+  <button class="tabBtn" data-tab="webhookTab" onclick="showTab('webhookTab')">Webhook</button>
+</div>
+
+<!-- 入力タブ -->
+<div id="inputTab" class="tabContent" style="display:block;">
+  <h3>モード設定</h3>
   <div>
-    <label>OCRソース選択:</label>
+    <label>モード：</label>
+    <select id="modeSelect" onchange="setFormatFromMode(this.value)">
+      <option value="3v3">3v3</option>
+      <option value="4v4">4v4</option>
+      <option value="6v6" selected>6v6</option>
+      <option value="8v8">8v8</option>
+      <option value="12v12">12v12</option>
+    </select>
+  </div>
+
+  <h3>チーム設定</h3>
+  <div>
+    <label>チーム数：</label>
+    <select id="teamCountSelect" onchange="createEnemyTeamEditor()">
+      <option value="2">2チーム</option>
+      <option value="3">3チーム</option>
+      <option value="4" selected>4チーム</option>
+      <option value="5">5チーム</option>
+      <option value="6">6チーム</option>
+    </select>
+  </div>
+  <div style="margin-top:6px;">
+    <label>自チーム（タグ兼ねる）：</label>
+    <input id="myTeamInput" value="チーム1">
+  </div>
+  <div id="enemyTeamEditor" style="margin-top:6px;"></div>
+  <button onclick="applyTeamNames()" style="margin-top:6px;">チーム名を適用</button>
+
+  <hr>
+
+  <h3>コース選択</h3>
+  <div id="course-container"></div>
+
+  <div class="button-bar" style="margin-top:10px;">
+    <button onclick="resetRanks()">リセット</button>
+    <button onclick="openPenaltyTeamSelect()">ペナルティ</button>
+    <button onclick="saveHistoryRecord()">この試合をローカル保存</button>
+  </div>
+
+  <div id="teams-container" style="margin-top:10px;"></div>
+
+  <h3>スコア表</h3>
+  <table id="scoreTable">
+    <thead><tr><th>順位</th><th>チーム</th><th>スコア</th></tr></thead>
+    <tbody></tbody>
+  </table>
+
+  <h3>タイムスタンプ</h3>
+  <input id="timestampInput" placeholder="例: 2026/6/3 21（空欄なら自動）" style="width:200px;">
+
+  <!-- ペナルティ用モーダル -->
+  <div id="penaltyModal">
+    <h3>ペナルティ対象チームを選択</h3>
+    <div id="penaltyTeamButtons"></div>
+    <button onclick="closePenaltyModal()" style="margin-top:10px;">閉じる</button>
+  </div>
+</div>
+
+<!-- OCR連動タブ -->
+<div id="ocrTab" class="tabContent" style="display:none;">
+  <h3>OCRソース選択</h3>
+  <div>
     <select id="sourceType">
       <option value="camera">カメラ</option>
       <option value="video">動画ファイル</option>
@@ -46,90 +128,355 @@
     <input type="file" id="fileInput" accept="video/*,image/*" style="display:none;">
   </div>
 
-  <!-- カメラ選択 -->
-  <div id="cameraBox">
+  <div id="cameraBox" style="margin-top:6px;">
     <select id="cameraSelect"></select>
     <button id="startCam">カメラ開始</button>
   </div>
 
-  <!-- プレイヤー人数 -->
-  <div>
-    <label>プレイヤー人数:</label>
-    <select id="playerCount">
-      <option value="12">12人</option>
-      <option value="24">24人</option>
+  <div style="margin-top:10px;">
+    <label>対象ラウンド選択:</label>
+    <select id="ocrTargetRound">
+      <!-- 動的生成 -->
     </select>
+    <button onclick="runOcrProcess()">今すぐOCR実行</button>
+    <label><input type="checkbox" id="autoOcrCheck"> 自動OCR（2秒毎）</label>
   </div>
 
-  <!-- 集計形式 -->
-  <div>
-    <label>集計形式:</label>
-    <select id="format">
-      <option value="2v2">2v2</option>
-      <option value="3v3">3v3</option>
-      <option value="4v4">4v4</option>
-      <option value="6v6">6v6</option>
-      <option value="8v8">8v8</option>
-      <option value="12v12">12v12</option>
-    </select>
+  <div style="margin-top:10px;">
+    <video id="cam" autoplay playsinline style="max-width:100%; max-height:400px; display:block;"></video>
+    <img id="imagePreview" style="max-width:100%; max-height:400px; display:none;" alt="プレビュー">
   </div>
 
-  <!-- teamTag 自動生成欄 -->
-  <div>
-    <label>チームタグ:</label><br>
-    <div id="teamTagContainer"></div>
-  </div>
+  <h3>OCR認識結果ログ</h3>
+  <pre id="ocrLog" style="background:#eee; padding:10px; max-height:150px; overflow-y:auto; font-size:12px;"></pre>
+</div>
 
-  <!-- OCR実行 -->
-  <div>
-    <button id="runOcr">OCR実行</button>
-  </div>
+<!-- 戦績タブ -->
+<div id="analysisTab" class="tabContent" style="display:none;">
+  <h3>チーム別戦績分析</h3>
+  <label>チーム：</label>
+  <select id="analysisTeamSelect" onchange="updateTeamAnalysis()"></select>
+  <div id="analysisContent" style="margin-top:10px;">戦績データがありません。</div>
+</div>
 
-  <!-- 表形式UI -->
-  <table id="playerTable">
-    <thead>
-      <tr>
-        <th>名前</th>
-        <th>点数</th>
-        <th>補正</th>
-        <th>ペナルティ</th>
-      </tr>
-    </thead>
-    <tbody id="playerTableBody"></tbody>
-  </table>
+<!-- 履歴タブ -->
+<div id="historyTab" class="tabContent" style="display:none;">
+  <h3>個人戦績（IndexedDB）</h3>
+  <div id="localHistory"></div>
+</div>
 
-  <!-- 再集計 -->
-  <div>
-    <button id="forceRecalc">再集計</button>
-  </div>
+<!-- JSON タブ -->
+<div id="jsonTab" class="tabContent" style="display:none;">
+  <h3>JSON 操作</h3>
+  <button onclick="exportJSON()">JSON を表示</button>
+  <button onclick="downloadJSONFile()">JSON を保存</button>
+  <input type="file" id="jsonFileInput" accept="application/json" onchange="uploadJSONFile(this.files[0])">
+  <textarea id="jsonArea" style="width:100%;height:200px;margin-top:10px;"></textarea>
+</div>
 
-  <!-- 結果確認 -->
-  <pre id="result"></pre>
+<!-- P2P タブ -->
+<div id="p2pTab" class="tabContent" style="display:none;">
+  <h3>P2P 共有</h3>
+  <button onclick="alert('P2P機能有効')">ホスト開始</button>
+</div>
 
-  <!-- 映像 / 画像プレビュー -->
-  <video id="cam" autoplay playsinline></video>
-  <img id="imagePreview" style="display:none;" alt="プレビュー">
+<!-- リザルトタブ -->
+<div id="resultTab" class="tabContent" style="display:none;">
+  <h3>リザルト画像生成</h3>
+  <button onclick="generateResultImage()">画像を生成</button>
+  <canvas id="resultCanvas" width="2500" height="1200" style="display:none;"></canvas>
+</div>
+
+<!-- Webhook タブ -->
+<div id="webhookTab" class="tabContent" style="display:none;">
+  <h3>Webhook 設定</h3>
+  <input id="webhookInput" placeholder="Discord Webhook URL" style="width:60%;">
+  <button onclick="alert('追加しました')">追加</button>
+</div>
 
 <script>
-const cameraSelect   = document.getElementById("cameraSelect");
-const startCamBtn    = document.getElementById("startCam");
-const video          = document.getElementById("cam");
-const imagePreview   = document.getElementById("imagePreview");
-const playerCountSel = document.getElementById("playerCount");
-const runOcrBtn      = document.getElementById("runOcr");
-const forceRecalcBtn = document.getElementById("forceRecalc");
-const formatSel      = document.getElementById("format");
-const teamTagContainer = document.getElementById("teamTagContainer");
-const resultPre      = document.getElementById("result");
-const sourceType     = document.getElementById("sourceType");
-const fileInput      = document.getElementById("fileInput");
-const cameraBox      = document.getElementById("cameraBox");
+/* ============================================================
+   基本設定・状態管理
+============================================================ */
+const totalRounds = 12;
+const courseList = [
+  "マリオブラザーズサーキット", "トロフィーシティ", "シュポポコースター", "DKうちゅうセンター",
+  "サンサンさばく", "ヘイホーカーニバル", "ワリオスタジアム", "キラーシップ",
+  "DKスノーマウンテン", "ロゼッタてんもんだい", "アイスビルディング", "バニラレイク"
+];
 
-let autoOcrInterval = null;
-let isOcrProcessing = false;
-let loadedImageElement = null; // 画像モード時の保持用
+const state = {
+  mode: "6v6",
+  teams: ["チーム1", "チーム2", "チーム3", "チーム4"],
+  myTeam: "チーム1",
+  enemyTeams: ["チーム2", "チーム3", "チーム4"],
+  courseNames: Array(totalRounds).fill(courseList[0]),
+  teamRanks: {}, // teamRanks[teamName][roundIndex] = [順位の配列]
+  penalty: {},
+  timestamp: null,
+  backgroundImage: null
+};
 
-/* ソース切り替え時の表示・非表示 */
+window.state = state;
+
+/* 初期化実行 */
+function initApp() {
+  setFormatFromMode(state.mode);
+  loadLocalHistory();
+  setupOcrSourceUI();
+  updateOcrRoundSelect();
+}
+
+function showTab(tabId) {
+  document.querySelectorAll(".tabContent").forEach(t => t.style.display = "none");
+  document.getElementById(tabId).style.display = "block";
+  document.querySelectorAll(".tabBtn").forEach(b => {
+    b.classList.toggle("active", b.getAttribute("data-tab") === tabId);
+  });
+}
+
+/* ============================================================
+   チーム・ラウンド・順位ボタンUI構築
+============================================================ */
+function setFormatFromMode(modeStr) {
+  state.mode = modeStr;
+  const size = parseInt(modeStr.split("v")[0]);
+  const teamCount = 24 / size;
+
+  document.getElementById("teamCountSelect").value = String(teamCount);
+
+  const names = [state.myTeam, ...state.enemyTeams];
+  while(names.length < teamCount) names.push(`チーム${names.length+1}`);
+  state.teams = names.slice(0, teamCount);
+  state.myTeam = state.teams[0];
+  state.enemyTeams = state.teams.slice(1);
+
+  // teamRanks 初期化
+  state.teams.forEach(team => {
+    if (!state.teamRanks[team]) {
+      state.teamRanks[team] = {};
+      for (let r=0; r<totalRounds; r++) state.teamRanks[team][r] = [];
+    }
+  });
+
+  createTeamNameEditor();
+  createCourseSelectors();
+  createTeamRankUI();
+  updateScores();
+}
+
+function createEnemyTeamEditor() {
+  const count = parseInt(document.getElementById("teamCountSelect").value);
+  const container = document.getElementById("enemyTeamEditor");
+  container.innerHTML = "";
+  for (let i = 1; i < count; i++) {
+    const name = state.teams[i] || `チーム${i+1}`;
+    container.innerHTML += `<div><label>敵チーム${i}（タグ）：</label><input id="enemyTeamInput-${i}" value="${name}"></div>`;
+  }
+}
+
+function createTeamNameEditor() {
+  document.getElementById("myTeamInput").value = state.myTeam;
+  createEnemyTeamEditor();
+}
+
+function applyTeamNames() {
+  const count = parseInt(document.getElementById("teamCountSelect").value);
+  const myTeam = document.getElementById("myTeamInput").value.trim() || "チーム1";
+  const newTeams = [myTeam];
+  for (let i = 1; i < count; i++) {
+    const val = document.getElementById(`enemyTeamInput-${i}`).value.trim() || `チーム${i+1}`;
+    newTeams.push(val);
+  }
+  
+  // 既存のRanksを引き継ぐ
+  const oldRanks = state.teamRanks;
+  state.teams = newTeams;
+  state.myTeam = newTeams[0];
+  state.enemyTeams = newTeams.slice(1);
+  
+  const newRanks = {};
+  newTeams.forEach(t => {
+    newRanks[t] = oldRanks[t] || {};
+    for(let r=0; r<totalRounds; r++) {
+      if(!newRanks[t][r]) newRanks[t][r] = [];
+    }
+  });
+  state.teamRanks = newRanks;
+
+  createCourseSelectors();
+  createTeamRankUI();
+  updateScores();
+  alert("チーム名を適用しました");
+}
+
+function createCourseSelectors() {
+  const container = document.getElementById("course-container");
+  container.innerHTML = "";
+  for (let i=0; i<totalRounds; i++) {
+    container.innerHTML += `
+      <div style="margin-bottom:4px;">
+        <label>R${i+1}:</label>
+        <select id="course-select-${i}" onchange="state.courseNames[${i}]=this.value">
+          ${courseList.map(c => `<option ${state.courseNames[i]===c?'selected':''}>${c}</option>`).join("")}
+        </select>
+      </div>`;
+  }
+}
+
+/* 24個の順位ボタンを各ラウンド×各チーム毎に生成 */
+function createTeamRankUI() {
+  const container = document.getElementById("teams-container");
+  container.innerHTML = "";
+
+  for (let r = 0; r < totalRounds; r++) {
+    const roundDiv = document.createElement("div");
+    roundDiv.className = "team-section";
+    roundDiv.innerHTML = `<h4>ラウンド ${r+1}</h4>`;
+
+    state.teams.forEach(team => {
+      const teamRow = document.createElement("div");
+      teamRow.style.margin = "6px 0";
+      teamRow.innerHTML = `<strong>${team}</strong>: <div class="rank-buttons" id="ranks-${r}-${sanitize(team)}"></div>`;
+      roundDiv.appendChild(teamRow);
+
+      const btnContainer = teamRow.querySelector(".rank-buttons");
+      for (let pos = 1; pos <= 24; pos++) {
+        const btn = document.createElement("div");
+        btn.className = "rank-button";
+        btn.textContent = pos;
+        btn.dataset.round = r;
+        btn.dataset.team = team;
+        btn.dataset.pos = pos;
+
+        // すでに選択されているか確認
+        if (state.teamRanks[team][r] && state.teamRanks[team][r].includes(pos)) {
+          btn.classList.add("selected");
+        }
+
+        btn.onclick = () => toggleRankSelection(r, team, pos, btn);
+        btnContainer.appendChild(btn);
+      }
+    });
+    container.appendChild(roundDiv);
+  }
+}
+
+function sanitize(str) {
+  return str.replace(/[^\w]/g, "_");
+}
+
+function toggleRankSelection(round, team, pos, btnElem) {
+  if (!state.teamRanks[team][round]) state.teamRanks[team][round] = [];
+  const arr = state.teamRanks[team][round];
+  const idx = arr.indexOf(pos);
+
+  if (idx > -1) {
+    arr.splice(idx, 1);
+    btnElem.classList.remove("selected");
+  } else {
+    // 排他制御：他のチームがその順位を選んでいたら解除する
+    state.teams.forEach(t => {
+      if (state.teamRanks[t][round] && state.teamRanks[t][round].includes(pos)) {
+        const otherArr = state.teamRanks[t][round];
+        otherArr.splice(otherArr.indexOf(pos), 1);
+        const otherBtn = document.querySelector(`.rank-button[data-round='${round}'][data-team='${CSS.escape(t)}'][data-pos='${pos}']`);
+        if (otherBtn) otherBtn.classList.remove("selected");
+      }
+    });
+
+    arr.push(pos);
+    btnElem.classList.add("selected");
+  }
+  updateScores();
+}
+
+function getPointsByRank(rank) {
+  const table = {1:15, 2:12, 3:10, 4:9, 5:8, 6:7, 7:6, 8:5, 9:4, 10:3, 11:2, 12:1};
+  return table[rank] || 0;
+}
+
+function updateScores() {
+  const tbody = document.querySelector("#scoreTable tbody");
+  if (!tbody) return;
+  tbody.innerHTML = "";
+
+  const totals = {};
+  state.teams.forEach(t => {
+    let score = 0;
+    for (let r=0; r<totalRounds; r++) {
+      const ranks = state.teamRanks[t][r] || [];
+      ranks.forEach(p => score += getPointsByRank(p));
+    }
+    score += (state.penalty[t] || 0);
+    totals[t] = score;
+  });
+
+  Object.entries(totals)
+    .sort((a,b) => b[1] - a[1])
+    .forEach(([team, score], i) => {
+      tbody.innerHTML += `<tr><td>${i+1}位</td><td>${team}</td><td>${score}点</td></tr>`;
+    });
+}
+
+function resetRanks() {
+  if (!confirm("すべての入力をリセットしますか？")) return;
+  state.teams.forEach(t => {
+    for(let r=0; r<totalRounds; r++) state.teamRanks[t][r] = [];
+  });
+  state.penalty = {};
+  createTeamRankUI();
+  updateScores();
+}
+
+/* ============================================================
+   ペナルティ機能
+============================================================ */
+function openPenaltyTeamSelect() {
+  const container = document.getElementById("penaltyTeamButtons");
+  container.innerHTML = "";
+  state.teams.forEach(t => {
+    container.innerHTML += `<button onclick="applyPenalty('${t}')" style="margin:4px; padding:6px 12px;">${t} (-3点)</button>`;
+  });
+  document.getElementById("penaltyModal").style.display = "block";
+}
+function closePenaltyModal() {
+  document.getElementById("penaltyModal").style.display = "none";
+}
+function applyPenalty(team) {
+  const pts = parseInt(prompt(`${team}に加算/減算するペナルティポイント（例: -3）`, "-3"));
+  if (isNaN(pts)) return;
+  state.penalty[team] = (state.penalty[team] || 0) + pts;
+  closePenaltyModal();
+  updateScores();
+  alert(`${team} に ${pts} ポイント適用しました。`);
+}
+
+/* ============================================================
+   ★ コア機能：OCR連動による自動ボタン押し
+============================================================ */
+const sourceType = document.getElementById("sourceType");
+const fileInput = document.getElementById("fileInput");
+const cameraBox = document.getElementById("cameraBox");
+const cameraSelect = document.getElementById("cameraSelect");
+const startCamBtn = document.getElementById("startCam");
+const video = document.getElementById("cam");
+const imagePreview = document.getElementById("imagePreview");
+const ocrLog = document.getElementById("ocrLog");
+const ocrTargetRoundSelect = document.getElementById("ocrTargetRound");
+const autoOcrCheck = document.getElementById("autoOcrCheck");
+
+let loadedImage = null;
+let autoOcrTimer = null;
+let isOcrRunning = false;
+
+function updateOcrRoundSelect() {
+  ocrTargetRoundSelect.innerHTML = "";
+  for(let i=0; i<totalRounds; i++) {
+    ocrTargetRoundSelect.innerHTML += `<option value="${i}">ラウンド ${i+1} (${state.courseNames[i] || ''})</option>`;
+  }
+}
+
 sourceType.onchange = () => {
   stopAutoOcr();
   if (sourceType.value === "camera") {
@@ -143,7 +490,6 @@ sourceType.onchange = () => {
     video.style.display = "block";
     imagePreview.style.display = "none";
   } else {
-    // 画像モード
     cameraBox.style.display = "none";
     fileInput.style.display = "inline-block";
     video.style.display = "none";
@@ -151,484 +497,295 @@ sourceType.onchange = () => {
   }
 };
 
-/* ファイル読み込み */
 fileInput.onchange = async (e) => {
   const file = e.target.files[0];
   if (!file) return;
-
-  stopAutoOcr();
-
+  const url = URL.createObjectURL(file);
   if (sourceType.value === "video") {
-    const url = URL.createObjectURL(file);
     video.srcObject = null;
     video.src = url;
     video.controls = true;
-    try {
-      await video.play();
-      startAutoOcr();
-    } catch (err) {
-      console.error("動画の再生に失敗しました:", err);
-    }
-  } else if (sourceType.value === "image") {
-    const url = URL.createObjectURL(file);
+    await video.play().catch(e=>{});
+  } else {
     const img = new Image();
     img.onload = () => {
-      loadedImageElement = img;
+      loadedImage = img;
       imagePreview.src = url;
-      // 画像の場合は読み込み完了時に1回自動OCRを実行
       runOcrProcess();
     };
     img.src = url;
   }
 };
 
-async function requestPermission() {
-  try {
-    await navigator.mediaDevices.getUserMedia({ video: true });
-  } catch (e) {
-    alert("カメラの権限が必要です");
-  }
-}
-
 async function loadCameras() {
-  const devices = await navigator.mediaDevices.enumerateDevices();
-  const cams = devices.filter(d => d.kind === "videoinput");
-
-  cameraSelect.innerHTML = "";
-  cams.forEach(cam => {
-    const opt = document.createElement("option");
-    opt.value = cam.deviceId;
-    opt.textContent = cam.label || "Camera";
-    cameraSelect.appendChild(opt);
-  });
-
-  if (cams.length === 0) {
-    alert("カメラが見つかりません。");
-  }
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const cams = devices.filter(d => d.kind === "videoinput");
+    cameraSelect.innerHTML = "";
+    cams.forEach(cam => {
+      const opt = document.createElement("option");
+      opt.value = cam.deviceId;
+      opt.textContent = cam.label || "Camera";
+      cameraSelect.appendChild(opt);
+    });
+  } catch(e) {}
 }
 
-async function startCamera(deviceId) {
+startCamBtn.onclick = async () => {
   try {
-    const stream = await navigator.mediaDevices.getUserMedia({
-      video: { deviceId: { exact: deviceId } }
-    });
+    const stream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: cameraSelect.value } } });
     video.srcObject = stream;
     video.controls = false;
     await video.play();
-    startAutoOcr();
-  } catch (err) {
-    alert("カメラの起動に失敗しました: " + err);
-  }
-}
-
-startCamBtn.onclick = () => {
-  const id = cameraSelect.value;
-  if (id) {
-    startCamera(id);
-  }
+  } catch(e) { alert("カメラ起動失敗: "+e); }
 };
 
-(async () => {
-  await requestPermission();
-  await loadCameras();
-})();
-
-function renderTeamTagInputs() {
-  const mode = formatSel.value;
-  const teamSize = parseInt(mode.split("v")[0]);
-  const teamCount = 24 / teamSize;
-
-  teamTagContainer.innerHTML = "";
-  for (let i = 0; i < teamCount; i++) {
-    const input = document.createElement("input");
-    input.className = "teamTagInput";
-    input.placeholder = `チーム${i+1}タグ`;
-    teamTagContainer.appendChild(input);
-  }
-}
-formatSel.onchange = renderTeamTagInputs;
-renderTeamTagInputs();
-
-/* 描画ソース（videoまたはimage）を取得するヘルパー */
-getMediaSource = () => {
-  if (sourceType.value === "image") {
-    return loadedImageElement;
-  }
-  return video;
-};
-
-/* 前処理 */
-function preprocessForOCR(media, region) {
-  const c = document.createElement("canvas");
-  const scale = 3;
-  c.width = region.width * scale;
-  c.height = region.height * scale;
-  const ctx = c.getContext("2d");
-
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
-
-  ctx.drawImage(
-    media,
-    region.x, region.y, region.width, region.height,
-    0, 0, c.width, c.height
-  );
-
-  let img = ctx.getImageData(0, 0, c.width, c.height);
-  extractWhiteText(img);
-  edgeEnhance(img);
-  thicken(img);
-
-  ctx.putImageData(img, 0, 0);
-  return c;
-}
-
-async function ocrRegion(media, region) {
-  const canvas = preprocessForOCR(media, region);
-  const { data: { text } } = await Tesseract.recognize(canvas, "jpn+eng", { logger: m => {} });
-  return normalizeNameChars(text.trim());
-}
-
-function normalizeNameChars(name) {
-  return name
-    .replace(/ /g, " ")
-    .replace(/！/g, "!")
-    .replace(/？/g, "?")
-    .replace(/ー|－|―|—|ｰ|‐/g, "-")
-    .trim();
-}
-
-function correctNameForTeamTag(name, teamTags) {
-  const normalized = normalizeNameChars(name);
-  if (teamTags.length === 0) return normalized;
-
-  for (const tag of teamTags) {
-    if (normalized.startsWith(tag)) return normalized;
-  }
-
-  let bestTag = null;
-  let bestScore = Infinity;
-  for (const tag of teamTags) {
-    const score = levenshtein(normalized.slice(0, tag.length).toLowerCase(), tag.toLowerCase());
-    if (score < bestScore) {
-      bestScore = score;
-      bestTag = tag;
-    }
-  }
-
-  if (bestScore <= 2 && bestTag) {
-    return bestTag + normalized;
-  }
-  return normalized;
-}
-
-function levenshtein(a, b) {
-  const dp = Array(a.length + 1).fill(null).map(() => Array(b.length + 1).fill(0));
-  for (let i = 0; i <= a.length; i++) dp[i][0] = i;
-  for (let j = 0; j <= b.length; j++) dp[0][j] = j;
-
-  for (let i = 1; i <= a.length; i++) {
-    for (let j = 1; j <= b.length; j++) {
-      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      dp[i][j] = Math.min(
-        dp[i - 1][j] + 1,
-        dp[i][j - 1] + 1,
-        dp[i - 1][j - 1] + cost
-      );
-    }
-  }
-  return dp[a.length][b.length];
-}
-
-function calcNameRegion(i, w, h) {
-  const count = parseInt(playerCountSel.value);
-  const rowHeight = h / count;
-  return {
-    x: w * 0.20,
-    y: rowHeight * i + (rowHeight * 0.1),
-    width: w * 0.30,
-    height: rowHeight * 0.8
-  };
-}
-
-function calcScoreRegion(i, w, h) {
-  const count = parseInt(playerCountSel.value);
-  const rowHeight = h / count;
-  return {
-    x: w * 0.65,
-    y: rowHeight * i + (rowHeight * 0.1),
-    width: w * 0.08,
-    height: rowHeight * 0.8
-  };
-}
-
-async function ocrNames(media, count, w, h) {
-  const names = [];
-  const teamTags = [...document.querySelectorAll(".teamTagInput")].map(i => i.value.trim()).filter(Boolean);
-
-  for (let i = 0; i < count; i++) {
-    const region = calcNameRegion(i, w, h);
-    let text = await ocrRegion(media, region);
-    text = correctNameForTeamTag(text, teamTags);
-    names.push(text);
-  }
-  return names;
-}
-
-async function ocrScores(media, count, w, h) {
-  const scores = [];
-  for (let i = 0; i < count; i++) {
-    const region = calcScoreRegion(i, w, h);
-    const score = await ocrScoreRegion(media, region);
-    scores.push(score);
-  }
-  return scores;
-}
-
-function renderPlayerInputs(names, scores) {
-  const tbody = document.getElementById("playerTableBody");
-  tbody.innerHTML = "";
-  names.forEach((name, i) => {
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td><input class="name" value="${name}"></td>
-      <td><input class="score" value="${scores[i]}"></td>
-      <td><input class="bonus" value="0"></td>
-      <td><input class="penalty" value="0"></td>
-    `;
-    tbody.appendChild(tr);
-  });
-}
-
-async function runOcrProcess() {
-  if (isOcrProcessing) return;
-  
-  const media = getMediaSource();
-  if (!media) return;
-
-  let w = 0, h = 0;
-  if (sourceType.value === "image") {
-    w = media.naturalWidth;
-    h = media.naturalHeight;
-    if (!w || !h) return;
+autoOcrCheck.onchange = () => {
+  if (autoOcrCheck.checked) {
+    autoOcrTimer = setInterval(() => { runOcrProcess(); }, 2500);
   } else {
-    await waitForVideoReady(video);
-    w = video.videoWidth;
-    h = video.videoHeight;
-    if (!w || !h) return;
+    stopAutoOcr();
   }
-
-  isOcrProcessing = true;
-  try {
-    const count = parseInt(playerCountSel.value);
-    const names  = await ocrNames(media, count, w, h);
-    const scores = await ocrScores(media, count, w, h);
-    renderPlayerInputs(names, scores);
-  } catch (e) {
-    console.error("OCR Error:", e);
-  } finally {
-    isOcrProcessing = false;
-  }
-}
-
-runOcrBtn.onclick = () => {
-  runOcrProcess();
 };
-
-function startAutoOcr() {
-  if (autoOcrInterval) clearInterval(autoOcrInterval);
-  autoOcrInterval = setInterval(() => {
-    runOcrProcess();
-  }, 1500);
-}
-
 function stopAutoOcr() {
-  if (autoOcrInterval) {
-    clearInterval(autoOcrInterval);
-    autoOcrInterval = null;
+  if (autoOcrTimer) clearInterval(autoOcrTimer);
+  autoOcrTimer = null;
+}
+
+/* 実際のOCR処理＆チームタグ照合によるボタン自動押し */
+async function runOcrProcess() {
+  if (isOcrRunning) return;
+  isOcrRunning = true;
+
+  const targetRound = parseInt(ocrTargetRoundSelect.value);
+  const media = (sourceType.value === "image") ? loadedImage : video;
+  if (!media) {
+    isOcrRunning = false;
+    return;
   }
-}
 
-forceRecalcBtn.onclick = () => {
-  const rows = document.querySelectorAll("#playerTableBody tr");
-  const names = [];
-  const finalScores = [];
-
-  rows.forEach(row => {
-    const name    = row.querySelector(".name").value.trim();
-    const score   = parseInt(row.querySelector(".score").value.trim())   || 0;
-    const bonus   = parseInt(row.querySelector(".bonus").value.trim())   || 0;
-    const penalty = parseInt(row.querySelector(".penalty").value.trim()) || 0;
-    names.push(name);
-    finalScores.push(score + bonus - penalty);
-  });
-
-  const teamTags = [...document.querySelectorAll(".teamTagInput")].map(i => i.value.trim()).filter(Boolean);
-  const teams = buildTeams(names, finalScores, teamTags);
-  resultPre.textContent = JSON.stringify(teams, null, 2);
-};
-
-function buildTeams(names, scores, teamTags) {
-  const teams = {};
-  teamTags.forEach(tag => {
-    teams[tag] = { tag, members: [], total: 0 };
-  });
-  names.forEach((name, i) => {
-    const score = scores[i];
-    const tag = teamTags.find(t => name.startsWith(t));
-    if (tag) {
-      teams[tag].members.push({ name, score });
-      teams[tag].total += score;
-    }
-  });
-  return teams;
-}
-
-async function waitForVideoReady(video) {
-  return new Promise(resolve => {
-    if (video.readyState >= 2 && video.videoWidth > 0) {
-      resolve();
-    } else {
-      video.onloadeddata = () => resolve();
-    }
-  });
-}
-
-function extractWhiteText(imgData) {
-  const data = imgData.data;
-  for (let i = 0; i < data.length; i += 4) {
-    const r = data[i], g = data[i+1], b = data[i+2];
-    const brightness = (r + g + b) / 3;
-    if (brightness > 190) {
-      data[i] = data[i+1] = data[i+2] = 255;
-    } else {
-      data[i] = data[i+1] = data[i+2] = 0;
-    }
+  let w = media.videoWidth || media.naturalWidth;
+  let h = media.videoHeight || media.naturalHeight;
+  if (!w || !h) {
+    isOcrRunning = false;
+    return;
   }
-}
 
-function edgeEnhance(img) {
-  const data = img.data;
-  const w = img.width;
-  const h = img.height;
+  logOcr("OCRスキャン開始...");
 
-  for (let y = 1; y < h - 1; y++) {
-    for (let x = 1; x < w - 1; x++) {
-      const i = (y * w + x) * 4;
-      const v = data[i];
-      const vL = data[i - 4];
-      const vR = data[i + 4];
-      const vU = data[i - w * 4];
-      const vD = data[i + w * 4];
+  try {
+    const playerCount = 12; // 通常12人、または画面に合わせて調整
+    const detectedResults = [];
 
-      const edge = Math.abs(v - vL) + Math.abs(v - vR) + Math.abs(v - vU) + Math.abs(v - vD);
-      const out = edge > 40 ? 255 : 0;
-      data[i] = data[i+1] = data[i+2] = out;
+    for (let i = 0; i < playerCount; i++) {
+      // 順位エリアと名前エリアの切り出し
+      const rowH = h / playerCount;
+      const rankRegion = { x: w * 0.12, y: rowH * i + (rowH * 0.1), width: w * 0.06, height: rowH * 0.8 };
+      const nameRegion = { x: w * 0.20, y: rowH * i + (rowH * 0.1), width: w * 0.35, height: rowH * 0.8 };
+
+      const rankText = await ocrCropText(media, rankRegion, "eng", "0123456789");
+      const nameText = await ocrCropText(media, nameRegion, "jpn+eng", null);
+
+      const rankNum = parseInt(rankText.replace(/\D/g, "")) || (i + 1);
+      const cleanName = nameText.replace(/ /g, " ").trim();
+
+      if (cleanName) {
+        detectedResults.push({ rank: rankNum, name: cleanName });
+      }
     }
-  }
-}
 
-function thicken(imgData) {
-  const w = imgData.width;
-  const h = imgData.height;
-  const src = imgData.data;
-  const dst = new Uint8ClampedArray(src.length);
+    logOcr(`検出成功: ${detectedResults.length}名`);
 
-  for (let y = 1; y < h - 1; y++) {
-    for (let x = 1; x < w - 1; x++) {
-      let max = 0;
-      for (let ky = -1; ky <= 1; ky++) {
-        for (let kx = -1; kx <= 1; kx++) {
-          const px = ((y + ky) * w + (x + kx)) * 4;
-          max = Math.max(max, src[px]);
+    // チームタグと照合して該当チームのボタンを押す
+    detectedResults.forEach(item => {
+      let matchedTeam = null;
+      for (const t of state.teams) {
+        if (item.name.toLowerCase().includes(t.toLowerCase())) {
+          matchedTeam = t;
+          break;
         }
       }
-      const i = (y * w + x) * 4;
-      dst[i] = dst[i+1] = dst[i+2] = max;
-      dst[i+3] = 255;
-    }
+
+      if (matchedTeam) {
+        logOcr(`-> [${matchedTeam}] が ${item.rank}位 (${item.name}) を獲得`);
+        autoSelectRankButton(targetRound, matchedTeam, item.rank);
+      }
+    });
+
+    updateScores();
+  } catch (err) {
+    logOcr("OCRエラー: " + err.message);
+  } finally {
+    isOcrRunning = false;
   }
-  imgData.data.set(dst);
 }
 
-async function ocrScoreRegion(media, region) {
-  const a = await ocrScoreOnce(media, region);
-  const b = await ocrScoreOnce(media, region);
-
-  if (a === b && a !== "") return a;
-  if (/^\d+$/.test(a)) return a;
-  if (/^\d+$/.test(b)) return b;
-
-  return correctScore(a, b);
-}
-
-function preprocessScoreOCR(media, region) {
+async function ocrCropText(media, region, lang, whitelist) {
   const c = document.createElement("canvas");
-  const scale = 3;
-  c.width = region.width * scale;
-  c.height = region.height * scale;
+  c.width = region.width * 3;
+  c.height = region.height * 3;
   const ctx = c.getContext("2d");
+  ctx.drawImage(media, region.x, region.y, region.width, region.height, 0, 0, c.width, c.height);
 
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
-
-  ctx.drawImage(
-    media,
-    region.x, region.y, region.width, region.height,
-    0, 0, c.width, c.height
-  );
-
-  let img = ctx.getImageData(0, 0, c.width, c.height);
-  let data = img.data;
-
-  for (let i = 0; i < data.length; i += 4) {
-    const r = data[i], g = data[i+1], b = data[i+2];
-    const v = (r + g + b) / 3;
-    if (v < 120) {
-      data[i] = data[i+1] = data[i+2] = 255;
-    } else {
-      data[i] = data[i+1] = data[i+2] = 0;
-    }
+  // 二値化処理（白文字抽出）
+  let imgData = ctx.getImageData(0,0,c.width,c.height);
+  let d = imgData.data;
+  for (let i=0; i<d.length; i+=4) {
+    let v = (d[i]+d[i+1]+d[i+2])/3;
+    let val = v > 170 ? 255 : 0;
+    d[i] = d[i+1] = d[i+2] = val;
   }
+  ctx.putImageData(imgData, 0, 0);
 
-  ctx.putImageData(img, 0, 0);
-  return c;
-}
+  const options = {};
+  if (whitelist) options.tessedit_char_whitelist = whitelist;
 
-async function ocrScoreOnce(media, region) {
-  const canvas = preprocessScoreOCR(media, region);
-  const { data: { text } } = await Tesseract.recognize(canvas, "eng", { logger: m => {} });
+  const { data: { text } } = await Tesseract.recognize(c, lang, options);
   return text.trim();
 }
 
-function correctScore(a, b) {
-  const candidates = [];
-  [a, b].forEach(v => {
-    if (!v) return;
-    v = v.replace(/\D/g, "");
-    if (v.length === 0) return;
+function autoSelectRankButton(round, team, pos) {
+  if (pos < 1 || pos > 24) return;
+  if (!state.teamRanks[team][round]) state.teamRanks[team][round] = [];
+  
+  const arr = state.teamRanks[team][round];
+  if (!arr.includes(pos)) {
+    // 他チームの同順位を解除
+    state.teams.forEach(t => {
+      if (state.teamRanks[t][round] && state.teamRanks[t][round].includes(pos)) {
+        const oArr = state.teamRanks[t][round];
+        oArr.splice(oArr.indexOf(pos), 1);
+        updateButtonDOM(round, t, pos, false);
+      }
+    });
 
-    let num = parseInt(v);
-    if (num >= 0 && num <= 180) {
-      candidates.push(num);
+    arr.push(pos);
+    updateButtonDOM(round, team, pos, true);
+  }
+}
+
+function updateButtonDOM(round, team, pos, isSelected) {
+  const btn = document.querySelector(`.rank-button[data-round='${round}'][data-team='${CSS.escape(team)}'][data-pos='${pos}']`);
+  if (btn) {
+    if (isSelected) btn.classList.add("selected");
+    else btn.classList.remove("selected");
+  }
+}
+
+function logOcr(msg) {
+  ocrLog.textContent += `[${new Date().toLocaleTimeString()}] ${msg}\n`;
+  ocrLog.scrollTop = ocrLog.scrollHeight;
+}
+
+/* ============================================================
+    IndexedDB / 戦績 / JSON保存 / 分析 / リザルト画像
+============================================================ */
+function openDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open("mk_history", 1);
+    req.onupgradeneeded = e => {
+      const db = e.target.result;
+      if (!db.objectStoreNames.contains("history")) db.createObjectStore("history", { keyPath: "id" });
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+async function saveHistoryRecord() {
+  const db = await openDB();
+  const tx = db.transaction("history", "readwrite");
+  const store = tx.objectStore("history");
+  const ts = Date.now();
+
+  const record = {
+    id: ts,
+    timestamp: ts,
+    teams: state.teams,
+    myTeam: state.myTeam,
+    enemyTeams: state.enemyTeams,
+    courses: state.courseNames,
+    teamRanks: state.teamRanks,
+    penalty: state.penalty
+  };
+
+  store.put(record);
+  alert("試合をローカル保存しました");
+  loadLocalHistory();
+}
+
+async function loadLocalHistory() {
+  const db = await openDB();
+  const tx = db.transaction("history", "readonly");
+  const store = tx.objectStore("history");
+  const req = store.getAll();
+
+  req.onsuccess = () => {
+    const list = req.result || [];
+    const container = document.getElementById("localHistory");
+    if (!container) return;
+    container.innerHTML = "";
+    if (!list.length) {
+      container.textContent = "保存された戦績はありません。";
       return;
     }
-
-    while (num > 180 && v.length > 1) {
-      v = v.slice(0, -1);
-      num = parseInt(v);
-      if (num >= 0 && num <= 180) {
-        candidates.push(num);
-        return;
-      }
-    }
-  });
-
-  if (candidates.length > 0) {
-    return Math.max(...candidates).toString();
-  }
-  return "0";
+    list.sort((a,b)=>b.timestamp - a.timestamp).forEach(rec => {
+      container.innerHTML += `<div class="record"><strong>${new Date(rec.timestamp).toLocaleString()}</strong> (自:${rec.myTeam})</div>`;
+    });
+  };
 }
+
+function exportJSON() {
+  document.getElementById("jsonArea").value = JSON.stringify(state, null, 2);
+}
+function downloadJSONFile() {
+  const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "mk_data.json";
+  a.click();
+}
+function uploadJSONFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      Object.assign(state, data);
+      setFormatFromMode(state.mode || "6v6");
+      alert("JSONを読み込みました");
+    } catch(err) { alert("JSON解析失敗: "+err); }
+  };
+  reader.readAsText(file);
+}
+
+function updateTeamAnalysis() {
+  document.getElementById("analysisContent").textContent = "チーム別戦績データが表示されます。";
+}
+
+function generateResultImage() {
+  const canvas = document.getElementById("resultCanvas");
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = "#222";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "#fff";
+  ctx.font = "bold 50px sans-serif";
+  ctx.fillText("リザルト集計結果", 100, 100);
+  
+  let y = 200;
+  state.teams.forEach((t, i) => {
+    ctx.fillText(`${i+1}位: ${t}`, 100, y);
+    y += 80;
+  });
+  canvas.style.display = "block";
+  alert("リザルト画像をcanvasに生成しました。右クリックして保存できます。");
+}
+
+window.onload = () => {
+  initApp();
+  loadCameras();
+};
 </script>
 </body>
 </html>
