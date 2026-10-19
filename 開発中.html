@@ -24,6 +24,12 @@
       margin-right: 6px;
       margin-bottom: 4px;
     }
+    #cam, #imagePreview {
+      max-width: 100%;
+      height: auto;
+      display: block;
+      margin-top: 10px;
+    }
   </style>
 </head>
 
@@ -100,13 +106,15 @@
   <!-- 結果確認 -->
   <pre id="result"></pre>
 
-  <!-- 映像 -->
+  <!-- 映像 / 画像プレビュー -->
   <video id="cam" autoplay playsinline></video>
+  <img id="imagePreview" style="display:none;" alt="プレビュー">
 
 <script>
 const cameraSelect   = document.getElementById("cameraSelect");
 const startCamBtn    = document.getElementById("startCam");
 const video          = document.getElementById("cam");
+const imagePreview   = document.getElementById("imagePreview");
 const playerCountSel = document.getElementById("playerCount");
 const runOcrBtn      = document.getElementById("runOcr");
 const forceRecalcBtn = document.getElementById("forceRecalc");
@@ -117,29 +125,29 @@ const sourceType     = document.getElementById("sourceType");
 const fileInput      = document.getElementById("fileInput");
 const cameraBox      = document.getElementById("cameraBox");
 
-let autoOcrRunning = false;
-let isCameraStarted = false;
-let isVideoFileLoaded = false;
+let autoOcrInterval = null;
 let isOcrProcessing = false;
+let loadedImageElement = null; // 画像モード時の保持用
 
-/* ソース切り替え */
+/* ソース切り替え時の表示・非表示 */
 sourceType.onchange = () => {
+  stopAutoOcr();
   if (sourceType.value === "camera") {
     fileInput.style.display = "none";
     cameraBox.style.display = "block";
-    isVideoFileLoaded = false;
-    checkAndStartOcr();
+    video.style.display = "block";
+    imagePreview.style.display = "none";
   } else if (sourceType.value === "video") {
     cameraBox.style.display = "none";
     fileInput.style.display = "inline-block";
-    isCameraStarted = false;
-    checkAndStartOcr();
+    video.style.display = "block";
+    imagePreview.style.display = "none";
   } else {
+    // 画像モード
     cameraBox.style.display = "none";
     fileInput.style.display = "inline-block";
-    isCameraStarted = false;
-    isVideoFileLoaded = false;
-    autoOcrRunning = false;
+    video.style.display = "none";
+    imagePreview.style.display = "block";
   }
 };
 
@@ -148,30 +156,27 @@ fileInput.onchange = async (e) => {
   const file = e.target.files[0];
   if (!file) return;
 
+  stopAutoOcr();
+
   if (sourceType.value === "video") {
     const url = URL.createObjectURL(file);
     video.srcObject = null;
     video.src = url;
     video.controls = true;
-    video.play();
-    isVideoFileLoaded = true;
-    checkAndStartOcr();
-  }
-
-  if (sourceType.value === "image") {
-    isVideoFileLoaded = false;
+    try {
+      await video.play();
+      startAutoOcr();
+    } catch (err) {
+      console.error("動画の再生に失敗しました:", err);
+    }
+  } else if (sourceType.value === "image") {
     const url = URL.createObjectURL(file);
     const img = new Image();
     img.onload = () => {
-      const c = document.createElement("canvas");
-      c.width = img.width;
-      c.height = img.height;
-      const ctx = c.getContext("2d");
-      ctx.drawImage(img, 0, 0);
-
-      video.srcObject = null;
-      video.src = c.toDataURL();
-      video.controls = false;
+      loadedImageElement = img;
+      imagePreview.src = url;
+      // 画像の場合は読み込み完了時に1回自動OCRを実行
+      runOcrProcess();
     };
     img.src = url;
   }
@@ -203,19 +208,23 @@ async function loadCameras() {
 }
 
 async function startCamera(deviceId) {
-  const stream = await navigator.mediaDevices.getUserMedia({
-    video: { deviceId: { exact: deviceId } }
-  });
-  video.srcObject = stream;
-  isCameraStarted = true;
-  checkAndStartOcr();
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: { deviceId: { exact: deviceId } }
+    });
+    video.srcObject = stream;
+    video.controls = false;
+    await video.play();
+    startAutoOcr();
+  } catch (err) {
+    alert("カメラの起動に失敗しました: " + err);
+  }
 }
 
 startCamBtn.onclick = () => {
   const id = cameraSelect.value;
   if (id) {
     startCamera(id);
-    video.controls = false;
   }
 };
 
@@ -240,8 +249,16 @@ function renderTeamTagInputs() {
 formatSel.onchange = renderTeamTagInputs;
 renderTeamTagInputs();
 
+/* 描画ソース（videoまたはimage）を取得するヘルパー */
+getMediaSource = () => {
+  if (sourceType.value === "image") {
+    return loadedImageElement;
+  }
+  return video;
+};
+
 /* 前処理 */
-function preprocessForOCR(video, region) {
+function preprocessForOCR(media, region) {
   const c = document.createElement("canvas");
   const scale = 3;
   c.width = region.width * scale;
@@ -252,7 +269,7 @@ function preprocessForOCR(video, region) {
   ctx.imageSmoothingQuality = 'high';
 
   ctx.drawImage(
-    video,
+    media,
     region.x, region.y, region.width, region.height,
     0, 0, c.width, c.height
   );
@@ -266,8 +283,8 @@ function preprocessForOCR(video, region) {
   return c;
 }
 
-async function ocrRegion(video, region) {
-  const canvas = preprocessForOCR(video, region);
+async function ocrRegion(media, region) {
+  const canvas = preprocessForOCR(media, region);
   const { data: { text } } = await Tesseract.recognize(canvas, "jpn+eng", { logger: m => {} });
   return normalizeNameChars(text.trim());
 }
@@ -323,51 +340,46 @@ function levenshtein(a, b) {
   return dp[a.length][b.length];
 }
 
-function calcNameRegion(i, vw, vh) {
+function calcNameRegion(i, w, h) {
   const count = parseInt(playerCountSel.value);
-  const rowHeight = vh / count;
+  const rowHeight = h / count;
   return {
-    x: vw * 0.20,
+    x: w * 0.20,
     y: rowHeight * i + (rowHeight * 0.1),
-    width: vw * 0.30,
+    width: w * 0.30,
     height: rowHeight * 0.8
   };
 }
 
-function calcScoreRegion(i, vw, vh) {
+function calcScoreRegion(i, w, h) {
   const count = parseInt(playerCountSel.value);
-  const rowHeight = vh / count;
+  const rowHeight = h / count;
   return {
-    x: vw * 0.65,
+    x: w * 0.65,
     y: rowHeight * i + (rowHeight * 0.1),
-    width: vw * 0.08,
+    width: w * 0.08,
     height: rowHeight * 0.8
   };
 }
 
-async function ocrNames(video, count) {
+async function ocrNames(media, count, w, h) {
   const names = [];
-  const vw = video.videoWidth;
-  const vh = video.videoHeight;
   const teamTags = [...document.querySelectorAll(".teamTagInput")].map(i => i.value.trim()).filter(Boolean);
 
   for (let i = 0; i < count; i++) {
-    const region = calcNameRegion(i, vw, vh);
-    let text = await ocrRegion(video, region);
+    const region = calcNameRegion(i, w, h);
+    let text = await ocrRegion(media, region);
     text = correctNameForTeamTag(text, teamTags);
     names.push(text);
   }
   return names;
 }
 
-async function ocrScores(video, count) {
+async function ocrScores(media, count, w, h) {
   const scores = [];
-  const vw = video.videoWidth;
-  const vh = video.videoHeight;
-
   for (let i = 0; i < count; i++) {
-    const region = calcScoreRegion(i, vw, vh);
-    const score = await ocrScoreRegion(video, region);
+    const region = calcScoreRegion(i, w, h);
+    const score = await ocrScoreRegion(media, region);
     scores.push(score);
   }
   return scores;
@@ -388,26 +400,54 @@ function renderPlayerInputs(names, scores) {
   });
 }
 
-async function waitForVideoReady(video) {
-  return new Promise(resolve => {
-    if (video.readyState >= 2 && video.videoWidth > 0) {
-      resolve();
-    } else {
-      video.onloadeddata = () => resolve();
-    }
-  });
+async function runOcrProcess() {
+  if (isOcrProcessing) return;
+  
+  const media = getMediaSource();
+  if (!media) return;
+
+  let w = 0, h = 0;
+  if (sourceType.value === "image") {
+    w = media.naturalWidth;
+    h = media.naturalHeight;
+    if (!w || !h) return;
+  } else {
+    await waitForVideoReady(video);
+    w = video.videoWidth;
+    h = video.videoHeight;
+    if (!w || !h) return;
+  }
+
+  isOcrProcessing = true;
+  try {
+    const count = parseInt(playerCountSel.value);
+    const names  = await ocrNames(media, count, w, h);
+    const scores = await ocrScores(media, count, w, h);
+    renderPlayerInputs(names, scores);
+  } catch (e) {
+    console.error("OCR Error:", e);
+  } finally {
+    isOcrProcessing = false;
+  }
 }
 
-runOcrBtn.onclick = async () => {
-  if (isOcrProcessing) return;
-  isOcrProcessing = true;
-  await waitForVideoReady(video);
-  const count = parseInt(playerCountSel.value);
-  const names  = await ocrNames(video, count);
-  const scores = await ocrScores(video, count);
-  renderPlayerInputs(names, scores);
-  isOcrProcessing = false;
+runOcrBtn.onclick = () => {
+  runOcrProcess();
 };
+
+function startAutoOcr() {
+  if (autoOcrInterval) clearInterval(autoOcrInterval);
+  autoOcrInterval = setInterval(() => {
+    runOcrProcess();
+  }, 1500);
+}
+
+function stopAutoOcr() {
+  if (autoOcrInterval) {
+    clearInterval(autoOcrInterval);
+    autoOcrInterval = null;
+  }
+}
 
 forceRecalcBtn.onclick = () => {
   const rows = document.querySelectorAll("#playerTableBody tr");
@@ -444,42 +484,14 @@ function buildTeams(names, scores, teamTags) {
   return teams;
 }
 
-function checkAndStartOcr() {
-  const isCameraModeActive = (sourceType.value === "camera" && isCameraStarted);
-  const isVideoModeActive = (sourceType.value === "video" && isVideoFileLoaded);
-
-  if (isCameraModeActive || isVideoModeActive) {
-    if (!autoOcrRunning) {
-      autoOcrRunning = true;
-      autoOcrLoop();
+async function waitForVideoReady(video) {
+  return new Promise(resolve => {
+    if (video.readyState >= 2 && video.videoWidth > 0) {
+      resolve();
+    } else {
+      video.onloadeddata = () => resolve();
     }
-  } else {
-    autoOcrRunning = false;
-  }
-}
-
-/* ★ 判定を排除し、有効な動画・カメラ映像であれば常に自動OCRを実行するように修正 */
-async function autoOcrLoop() {
-  if (!autoOcrRunning) return;
-  
-  if (!isOcrProcessing) {
-    isOcrProcessing = true;
-    await waitForVideoReady(video);
-
-    const count = parseInt(playerCountSel.value);
-    const names  = await ocrNames(video, count);
-    const scores = await ocrScores(video, count);
-    renderPlayerInputs(names, scores);
-
-    isOcrProcessing = false;
-  }
-
-  // 実行頻度を適度に調整（高負荷を防ぐため少しインターバルを挟むことも可能ですが、ループを継続）
-  if (autoOcrRunning) {
-    setTimeout(() => {
-      requestAnimationFrame(autoOcrLoop);
-    }, 1000); // 1秒ごとに自動でOCRを走らせる
-  }
+  });
 }
 
 function extractWhiteText(imgData) {
@@ -539,9 +551,9 @@ function thicken(imgData) {
   imgData.data.set(dst);
 }
 
-async function ocrScoreRegion(video, region) {
-  const a = await ocrScoreOnce(video, region);
-  const b = await ocrScoreOnce(video, region);
+async function ocrScoreRegion(media, region) {
+  const a = await ocrScoreOnce(media, region);
+  const b = await ocrScoreOnce(media, region);
 
   if (a === b && a !== "") return a;
   if (/^\d+$/.test(a)) return a;
@@ -550,7 +562,7 @@ async function ocrScoreRegion(video, region) {
   return correctScore(a, b);
 }
 
-function preprocessScoreOCR(video, region) {
+function preprocessScoreOCR(media, region) {
   const c = document.createElement("canvas");
   const scale = 3;
   c.width = region.width * scale;
@@ -561,7 +573,7 @@ function preprocessScoreOCR(video, region) {
   ctx.imageSmoothingQuality = 'high';
 
   ctx.drawImage(
-    video,
+    media,
     region.x, region.y, region.width, region.height,
     0, 0, c.width, c.height
   );
@@ -583,8 +595,8 @@ function preprocessScoreOCR(video, region) {
   return c;
 }
 
-async function ocrScoreOnce(video, region) {
-  const canvas = preprocessScoreOCR(video, region);
+async function ocrScoreOnce(media, region) {
+  const canvas = preprocessScoreOCR(media, region);
   const { data: { text } } = await Tesseract.recognize(canvas, "eng", { logger: m => {} });
   return text.trim();
 }
