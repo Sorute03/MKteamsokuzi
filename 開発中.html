@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>MKteamsokuzi ＋ 即時OCR入力統合版</title>
+<title>MKteamsokuzi ＋ 切り出し枠可視化OCR版</title>
 <link rel="icon" href="data:,">
 <script src="https://unpkg.com/obs-websocket-js"></script>
 <script src="https://unpkg.com/tesseract.js@v4.0.2/dist/tesseract.min.js"></script>
@@ -33,10 +33,6 @@ body { margin:0; padding:10px; font-family:sans-serif; }
   padding:20px; border:2px solid #333; border-radius:10px; z-index:9999; box-shadow:0 4px 10px rgba(0,0,0,0.3);
 }
 .record { border:1px solid #ccc; padding:6px; margin:4px 0; font-size:12px; }
-#jsonDropArea {
-  width:100%; height:120px; border:2px dashed #888; border-radius:10px;
-  display:flex; align-items:center; justify-content:center; background:#fafafa;
-}
 table { border-collapse: collapse; margin-top: 10px; width: 100%; }
 th, td { border: 1px solid #aaa; padding: 6px; text-align: center; }
 
@@ -46,6 +42,27 @@ th, td { border: 1px solid #aaa; padding: 6px; text-align: center; }
   padding: 12px;
   border-radius: 8px;
   margin-bottom: 20px;
+}
+/* プレビューと枠を重ねるためのコンテナ */
+.media-container {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  background: #000;
+}
+#cam, #imagePreview {
+  display: block;
+  max-width: 100%;
+  max-height: 350px;
+}
+/* 切り出し位置を確認するためのオーバーレイキャンバス */
+#debugCanvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none; /* マウスイベントを透過 */
 }
 </style>
 </head>
@@ -67,7 +84,7 @@ th, td { border: 1px solid #aaa; padding: 6px; text-align: center; }
 
   <!-- OCR 統合エリア -->
   <div class="ocr-integration-box">
-    <h3>📷 自動OCR入力（3秒間マルチサンプリング対応）</h3>
+    <h3>📷 自動OCR入力（切り出し枠可視化モード）</h3>
     <div>
       <label>OCRソース選択:</label>
       <select id="sourceType">
@@ -89,18 +106,21 @@ th, td { border: 1px solid #aaa; padding: 6px; text-align: center; }
         <select id="ocrTargetRound"></select>
       </div>
       <label><input type="checkbox" id="autoAdvanceCheck" checked> 反映後に次ラウンドへ自動切り替え</label>
-      <button id="runOcrBtn" onclick="runOcrProcess()" style="font-weight:bold; padding:4px 10px;">今すぐOCR実行（3秒間集約）</button>
-      <label><input type="checkbox" id="autoOcrCheck"> 自動OCR（3秒間隔ループ）</label>
+      <label><input type="checkbox" id="showDebugOverlay" checked onchange="drawDebugOverlay()"> 切り出し枠を表示</label>
+      <button id="runOcrBtn" onclick="runOcrProcess()" style="font-weight:bold; padding:4px 10px;">今すぐOCR実行</button>
+      <label><input type="checkbox" id="autoOcrCheck"> 自動OCR（3秒毎）</label>
     </div>
 
-    <div style="margin-top:10px;">
-      <video id="cam" autoplay playsinline style="max-width:100%; max-height:300px; display:block; background:#000;"></video>
-      <img id="imagePreview" style="max-width:100%; max-height:300px; display:none;" alt="プレビュー">
+    <!-- プレビュー＆切り出し枠オーバーレイ表示エリア -->
+    <div style="margin-top:10px;" class="media-container" id="mediaContainer">
+      <video id="cam" autoplay playsinline></video>
+      <img id="imagePreview" style="display:none;" alt="プレビュー">
+      <canvas id="debugCanvas"></canvas>
     </div>
 
     <div style="margin-top:8px;">
       <label>OCR認識ログ:</label>
-      <pre id="ocrLog" style="background:#eee; padding:6px; max-height:100px; overflow-y:auto; font-size:11px; margin:4px 0 0 0;"></pre>
+      <pre id="ocrLog" style="background:#eee; padding:6px; max-height:120px; overflow-y:auto; font-size:11px; margin:4px 0 0 0;"></pre>
     </div>
   </div>
 
@@ -465,7 +485,7 @@ function applyPenalty(team) {
 }
 
 /* ============================================================
-   ★ OCR連動（3秒間マルチサンプリング対応版）
+   ★ OCR連動 ＆ 切り出し枠デバッグ描画エンジン
 ============================================================ */
 const sourceType = document.getElementById("sourceType");
 const fileInput = document.getElementById("fileInput");
@@ -474,15 +494,18 @@ const cameraSelect = document.getElementById("cameraSelect");
 const startCamBtn = document.getElementById("startCam");
 const video = document.getElementById("cam");
 const imagePreview = document.getElementById("imagePreview");
+const debugCanvas = document.getElementById("debugCanvas");
 const ocrLog = document.getElementById("ocrLog");
 const ocrTargetRoundSelect = document.getElementById("ocrTargetRound");
 const autoOcrCheck = document.getElementById("autoOcrCheck");
 const autoAdvanceCheck = document.getElementById("autoAdvanceCheck");
+const showDebugOverlayCheck = document.getElementById("showDebugOverlay");
 const runOcrBtn = document.getElementById("runOcrBtn");
 
 let loadedImage = null;
 let autoOcrTimer = null;
 let isOcrRunning = false;
+let debugAnimId = null;
 
 function setupOcrSourceUI() {
   sourceType.onchange = () => {
@@ -503,6 +526,7 @@ function setupOcrSourceUI() {
       video.style.display = "none";
       imagePreview.style.display = "block";
     }
+    startDebugLoop();
   };
 
   fileInput.onchange = async (e) => {
@@ -519,6 +543,7 @@ function setupOcrSourceUI() {
       img.onload = () => {
         loadedImage = img;
         imagePreview.src = url;
+        startDebugLoop();
         runOcrProcess();
       };
       img.src = url;
@@ -527,21 +552,23 @@ function setupOcrSourceUI() {
 
   startCamBtn.onclick = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: cameraSelect.value }, width: { ideal: 3840 }, height: { ideal: 2160 } } });
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: cameraSelect.value }, width: { ideal: 1920 }, height: { ideal: 1080 } } });
       video.srcObject = stream;
       video.controls = false;
       await video.play();
+      startDebugLoop();
     } catch(e) { alert("カメラ起動失敗: "+e); }
   };
 
   autoOcrCheck.onchange = () => {
     if (autoOcrCheck.checked) {
-      // 3秒間のマルチサンプリングを行うため、インターバルは余裕を持たせて5秒毎に設定
-      autoOcrTimer = setInterval(() => { runOcrProcess(); }, 5000);
+      autoOcrTimer = setInterval(() => { runOcrProcess(); }, 3000);
     } else {
       stopAutoOcr();
     }
   };
+
+  video.onloadedmetadata = () => { startDebugLoop(); };
 }
 
 function updateOcrRoundSelect() {
@@ -575,7 +602,53 @@ async function loadCameras() {
   } catch(e) {}
 }
 
-// ★ 3秒間（複数回サンプリング）OCRを実行して結果を集約するメイン関数
+// ★ 切り出し枠（デバッグ用オーバーレイ）をリアルタイムで描画
+function startDebugLoop() {
+  if (debugAnimId) cancelAnimationFrame(debugAnimId);
+
+  function loop() {
+    drawDebugOverlay();
+    debugAnimId = requestAnimationFrame(loop);
+  }
+  loop();
+}
+
+function drawDebugOverlay() {
+  const media = (sourceType.value === "image") ? loadedImage : video;
+  if (!media) return;
+
+  const w = media.videoWidth || media.naturalWidth || media.width;
+  const h = media.videoHeight || media.naturalHeight || media.height;
+  if (!w || !h) return;
+
+  if (debugCanvas.width !== w || debugCanvas.height !== h) {
+    debugCanvas.width = w;
+    debugCanvas.height = h;
+  }
+
+  const ctx = debugCanvas.getContext("2d");
+  ctx.clearRect(0, 0, w, h);
+
+  if (!showDebugOverlayCheck.checked) return;
+
+  const playerCount = 12;
+  for (let i = 0; i < playerCount; i++) {
+    const rowH = h / playerCount;
+
+    // 順位検出エリアの枠（黄色）
+    const rankRegion = { x: w * 0.11, y: rowH * i + (rowH * 0.08), width: w * 0.06, height: rowH * 0.84 };
+    ctx.strokeStyle = "rgba(255, 255, 0, 0.8)";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(rankRegion.x, rankRegion.y, rankRegion.width, rankRegion.height);
+
+    // 名前検出エリアの枠（緑色） - ここがプレイヤー名を読むエリアです
+    const nameRegion = { x: w * 0.19, y: rowH * i + (rowH * 0.08), width: w * 0.28, height: rowH * 0.84 };
+    ctx.strokeStyle = "rgba(0, 255, 0, 0.8)";
+    ctx.lineWidth = 3;
+    ctx.strokeRect(nameRegion.x, nameRegion.y, nameRegion.width, nameRegion.height);
+  }
+}
+
 async function runOcrProcess() {
   if (isOcrRunning) return;
   isOcrRunning = true;
@@ -599,69 +672,55 @@ async function runOcrProcess() {
     return;
   }
 
-  logOcr(`📷 3秒間OCRマルチサンプリング開始 [R${targetRound+1}]...`);
+  logOcr(`🔍 OCRスキャン開始 [R${targetRound+1}] (解像度: ${w}x${h})...`);
 
   try {
-    const sampleCount = 3; // 3秒間に3回（1秒おき）スキャン
-    const sampleIntervalMs = 1000;
-    const teamVoteMap = {}; // チームごとに検出された順位の票を集計
+    const playerCount = 12;
+    const detectedResults = [];
 
-    for (let s = 0; s < sampleCount; s++) {
-      if (s > 0) {
-        await new Promise(r => setTimeout(r, sampleIntervalMs));
-      }
+    for (let i = 0; i < playerCount; i++) {
+      const rowH = h / playerCount;
+      const rankRegion = { x: w * 0.11, y: rowH * i + (rowH * 0.08), width: w * 0.06, height: rowH * 0.84 };
+      const nameRegion = { x: w * 0.19, y: rowH * i + (rowH * 0.08), width: w * 0.28, height: rowH * 0.84 };
 
-      const playerCount = 12;
-      for (let i = 0; i < playerCount; i++) {
-        const rowH = h / playerCount;
-        const rankRegion = { x: w * 0.10, y: rowH * i + (rowH * 0.08), width: w * 0.07, height: rowH * 0.84 };
-        const nameRegion = { x: w * 0.19, y: rowH * i + (rowH * 0.08), width: w * 0.28, height: rowH * 0.84 };
+      const rankText = await ocrCropTextUltra(media, rankRegion, "eng", "0123456789");
+      const nameText = await ocrCropTextUltra(media, nameRegion, "jpn+eng", null);
 
-        const rankText = await ocrCropTextHighQuality(media, rankRegion, "eng", "0123456789");
-        const nameText = await ocrCropTextHighQuality(media, nameRegion, "jpn+eng", null);
+      const rankNum = parseInt(rankText.replace(/\D/g, "")) || (i + 1);
+      let cleanName = nameText
+        .replace(/ /g, " ")
+        .replace(/[／＼｜│┃]/g, "")
+        .replace(/\d+点|\d+位|点|位/g, "")
+        .trim();
 
-        const rankNum = parseInt(rankText.replace(/\D/g, "")) || (i + 1);
-        let cleanName = nameText
-          .replace(/ /g, " ")
-          .replace(/\d+点|\d+位|点|位/g, "")
-          .trim();
-
-        if (cleanName) {
-          for (const t of state.teams) {
-            if (!t || t.trim() === "") continue;
-            const tag = t.toLowerCase();
-            const nameLower = cleanName.toLowerCase();
-
-            if (nameLower.startsWith(tag) || nameLower.includes(tag)) {
-              if (!teamVoteMap[t]) teamVoteMap[t] = {};
-              if (!teamVoteMap[t][rankNum]) teamVoteMap[t][rankNum] = 0;
-              teamVoteMap[t][rankNum]++;
-            }
-          }
-        }
+      if (cleanName) {
+        detectedResults.push({ rank: rankNum, name: cleanName });
       }
     }
 
-    // 3秒間の集計結果から最も票数の多かった順位を採用
-    let matchCount = 0;
-    Object.entries(teamVoteMap).forEach(([team, ranksObj]) => {
-      let bestRank = null;
-      let maxVotes = 0;
-      Object.entries(ranksObj).forEach(([rank, votes]) => {
-        if (votes > maxVotes) {
-          maxVotes = votes;
-          bestRank = parseInt(rank);
-        }
-      });
+    logOcr(`検出成功: ${detectedResults.length}名`);
 
-      if (bestRank !== null) {
+    let matchCount = 0;
+    detectedResults.forEach(item => {
+      let matchedTeam = null;
+      for (const t of state.teams) {
+        if (!t || t.trim() === "") continue;
+        const tag = t.toLowerCase();
+        const nameLower = item.name.toLowerCase();
+
+        if (nameLower.startsWith(tag) || nameLower.includes(tag)) {
+          matchedTeam = t;
+          break;
+        }
+      }
+
+      if (matchedTeam) {
         matchCount++;
-        logOcr(`✨ 確定 [${team}] -> ${bestRank}位 (投票数: ${maxVotes}/${sampleCount})`);
-        autoSelectRankButton(targetRound, team, bestRank);
+        logOcr(`✨ R${targetRound+1} 検出: [${matchedTeam}] -> ${item.rank}位 (${item.name})`);
+        autoSelectRankButton(targetRound, matchedTeam, item.rank);
       }
     });
 
-    logOcr(`3秒サンプリング完了 (合致チーム数: ${matchCount})`);
     updateScores();
 
     if (matchCount > 0 && autoAdvanceCheck.checked) {
@@ -679,10 +738,10 @@ async function runOcrProcess() {
   }
 }
 
-async function ocrCropTextHighQuality(media, region, lang, whitelist) {
+async function ocrCropTextUltra(media, region, lang, whitelist) {
   const c = document.createElement("canvas");
-  c.width = Math.max(Math.floor(region.width * 4), 100);
-  c.height = Math.max(Math.floor(region.height * 4), 60);
+  c.width = Math.max(Math.floor(region.width * 4), 120);
+  c.height = Math.max(Math.floor(region.height * 4), 80);
   const ctx = c.getContext("2d");
   ctx.imageSmoothingEnabled = true;
   ctx.imageSmoothingQuality = "high";
@@ -691,14 +750,17 @@ async function ocrCropTextHighQuality(media, region, lang, whitelist) {
 
   let imgData = ctx.getImageData(0, 0, c.width, c.height);
   let d = imgData.data;
+  
   for (let i = 0; i < d.length; i += 4) {
-    let v = (d[i] + d[i+1] + d[i+2]) / 3;
-    let val = v > 165 ? 255 : 0;
+    let brightness = (d[i] * 0.299 + d[i+1] * 0.587 + d[i+2] * 0.114);
+    let val = brightness > 155 ? 255 : 0;
     d[i] = d[i+1] = d[i+2] = val;
   }
   ctx.putImageData(imgData, 0, 0);
 
-  const options = {};
+  const options = {
+    tessedit_pageseg_mode: '6'
+  };
   if (whitelist) options.tessedit_char_whitelist = whitelist;
 
   const { data: { text } } = await Tesseract.recognize(c, lang, options);
