@@ -1261,8 +1261,22 @@ function createTeamInputs() {
     section.appendChild(header);
 
     state.teams.forEach((team, teamIndex) => {
+      // チーム名ラベル（ここをクリックするとキーボード入力が開始できるようにフォーカスを当てる）
       const label = document.createElement("div");
       label.textContent = team;
+      label.style.cursor = "pointer";
+      label.style.fontWeight = "bold";
+      label.style.marginTop = "8px";
+      label.title = "クリックしてキーボード入力を開始";
+      
+      label.onclick = () => {
+        const firstBtn = document.querySelector(
+          `.rank-button[data-team="${team}"][data-round="${round}"][data-rank="1"]`
+        );
+        if (firstBtn) {
+          firstBtn.focus();
+        }
+      };
 
       const row = document.createElement("div");
       row.className = "rank-buttons";
@@ -1272,8 +1286,7 @@ function createTeamInputs() {
         btn.className = "rank-button";
         btn.textContent = rank;
         
-        // ★ キーボード操作対応用の属性とイベントの追加
-        btn.tabIndex = 0; // Tabキーやフォーカス移動を有効化
+        btn.tabIndex = 0; // キーボードフォーカスを有効化
         btn.dataset.team = team;
         btn.dataset.teamIndex = teamIndex;
         btn.dataset.round = round;
@@ -1293,34 +1306,90 @@ function createTeamInputs() {
   }
 }
 
-function toggleRank(team, round, rank, btn) {
-  const arr = state.teamRanks[team][round];
-  const idx = arr.indexOf(rank);
-
-  // ① 選択済み → 必ず解除できる
-  if (idx >= 0) {
-    arr.splice(idx, 1);
-    btn.classList.remove("selected");
-    updateScores();
+function handleButtonKeyDown(e, team, round, rank, btn) {
+  // ① Enter キーが押されたら、現在溜まっている入力（カンマ区切り含む）を一気に確定して反映
+  if (e.key === "Enter") {
+    e.preventDefault();
+    clearTimeout(keyBufferTimer);
+    processBufferInput(team, round);
     return;
   }
 
-  // ② 未選択 → 人数制限チェックして追加
-  const need = state.teamSizeMap[team];
-  if (arr.length < need) {
-    arr.push(rank);
-    btn.classList.add("selected");
-  } else {
-    alert(`${team} は最大 ${need} 人です`);
+  // Space キーで個別の選択/解除
+  if (e.key === " ") {
+    e.preventDefault();
+    toggleRank(team, round, rank, btn);
     return;
   }
 
-  // ③ 自動補完はそのまま動く
-  autoFillMissingTeam(round);
+  // ② 矢印キー（↑ ↓ ← →）でフォーカス移動
+  if (["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+    e.preventDefault();
+    
+    // 移動する前に溜まっていた入力があれば一度確定させる
+    if (keyBuffer) {
+      processBufferInput(team, round);
+    }
 
-  updateScores();
+    const currentTeamIdx = parseInt(btn.dataset.teamIndex, 10);
+    let targetTeamIdx = currentTeamIdx;
+    let targetRank = rank;
+
+    if (e.key === "ArrowLeft") targetRank = Math.max(1, rank - 1);
+    if (e.key === "ArrowRight") targetRank = Math.min(24, rank + 1);
+    if (e.key === "ArrowUp") targetTeamIdx = Math.max(0, currentTeamIdx - 1);
+    if (e.key === "ArrowDown") targetTeamIdx = Math.min(state.teams.length - 1, currentTeamIdx + 1);
+
+    const targetTeam = state.teams[targetTeamIdx];
+    const targetBtn = document.querySelector(
+      `.rank-button[data-team="${targetTeam}"][data-round="${round}"][data-rank="${targetRank}"]`
+    );
+    if (targetBtn) targetBtn.focus();
+    return;
+  }
+
+  // ③ カンマ（,）または数字（0〜9）での入力処理
+  if (e.key === "," || (e.key >= "0" && e.key <= "9")) {
+    e.preventDefault();
+
+    if (e.key === ",") {
+      keyBuffer += ",";
+      return;
+    }
+
+    keyBuffer += e.key;
+    
+    clearTimeout(keyBufferTimer);
+    keyBufferTimer = setTimeout(() => {
+      processBufferInput(team, round);
+    }, 1500); // 1.5秒経過またはEnter押下で確定
+  }
 }
 
+// カンマ区切りの文字列（例: "1,5,12"）を解析して順位に一括反映する関数
+function processBufferInput(team, round) {
+  if (!keyBuffer) return;
+  
+  const rawData = keyBuffer;
+  keyBuffer = ""; // バッファをリセット
+
+  const parts = rawData.split(",");
+
+  parts.forEach(part => {
+    const targetRankNum = parseInt(part.trim(), 10);
+    if (targetRankNum >= 1 && targetRankNum <= 24) {
+      const targetBtn = document.querySelector(
+        `.rank-button[data-team="${team}"][data-round="${round}"][data-rank="${targetRankNum}"]`
+      );
+      if (targetBtn) {
+        const arr = state.teamRanks[team][round];
+        if (!arr.includes(targetRankNum)) {
+          toggleRank(team, round, targetRankNum, targetBtn);
+        }
+      }
+    }
+  });
+}
   
 
 
@@ -1386,32 +1455,7 @@ function handleButtonKeyDown(e, team, round, rank, btn) {
   }
 }
 
-// カンマ区切りの文字列（例: "1,5,12"）を解析して順位に一括反映する関数
-function processBufferInput(team, round) {
-  if (!keyBuffer) return;
-  
-  const rawData = keyBuffer;
-  keyBuffer = ""; // バッファをリセット
 
-  // カンマ区切りで分割して数値化
-  const parts = rawData.split(",");
-
-  parts.forEach(part => {
-    const targetRankNum = parseInt(part.trim(), 10);
-    if (targetRankNum >= 1 && targetRankNum <= 24) {
-      const targetBtn = document.querySelector(
-        `.rank-button[data-team="${team}"][data-round="${round}"][data-rank="${targetRankNum}"]`
-      );
-      if (targetBtn) {
-        const arr = state.teamRanks[team][round];
-        // まだ選択されていない場合のみトグル（選択）する
-        if (!arr.includes(targetRankNum)) {
-          toggleRank(team, round, targetRankNum, targetBtn);
-        }
-      }
-    }
-  });
-}
   
 function autoFillMissingTeam(round) {
   const filled = state.teams.filter(t =>
