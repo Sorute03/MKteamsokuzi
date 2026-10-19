@@ -120,7 +120,7 @@ const cameraBox      = document.getElementById("cameraBox");
 let autoOcrRunning = false;
 let isCameraStarted = false;
 let isVideoFileLoaded = false;
-let isOcrProcessing = false; // 重複実行防止用ロック
+let isOcrProcessing = false;
 
 /* ソース切り替え */
 sourceType.onchange = () => {
@@ -266,7 +266,7 @@ function preprocessForOCR(video, region) {
   return c;
 }
 
-/* 名前用 OCR（安定版 Tesseract.ize直接呼び出し） */
+/* 名前用 OCR */
 async function ocrRegion(video, region) {
   const canvas = preprocessForOCR(video, region);
   const { data: { text } } = await Tesseract.recognize(canvas, "jpn+eng", { logger: m => {} });
@@ -284,6 +284,8 @@ function normalizeNameChars(name) {
 
 function correctNameForTeamTag(name, teamTags) {
   const normalized = normalizeNameChars(name);
+  if (teamTags.length === 0) return normalized;
+
   for (const tag of teamTags) {
     if (normalized.startsWith(tag)) return normalized;
   }
@@ -298,7 +300,7 @@ function correctNameForTeamTag(name, teamTags) {
     }
   }
 
-  if (bestScore <= 1) {
+  if (bestScore <= 2 && bestTag) {
     return bestTag + normalized;
   }
   return normalized;
@@ -312,7 +314,11 @@ function levenshtein(a, b) {
   for (let i = 1; i <= a.length; i++) {
     for (let j = 1; j <= b.length; j++) {
       const cost = a[i - 1] === b[j - 1] ? 0 : 1;
-      dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost);
+      dp[i][j] = Math.min(
+        dp[i - 1][j] + 1,
+        dp[i][j - 1] + 1,
+        dp[i - 1][j - 1] + cost
+      );
     }
   }
   return dp[a.length][b.length];
@@ -341,10 +347,6 @@ function calcScoreRegion(i, vw, vh) {
 }
 
 async function ocrNames(video, count) {
-  if (!isFinalResultScreen(video)) {
-    return Array(count).fill("");
-  }
-
   const names = [];
   const vw = video.videoWidth;
   const vh = video.videoHeight;
@@ -467,46 +469,9 @@ function detectFinalResultText(video) {
   return whiteCount > 1800;
 }
 
-function isTeamBattle() {
-  const mode = formatSel.value;
-  return ["6v6", "8v8", "12v12"].includes(mode);
-}
-
-function detectTeamColorPanels(video) {
-  const c = document.createElement("canvas");
-  c.width = 200;
-  c.height = 200;
-  const ctx = c.getContext("2d");
-
-  ctx.drawImage(
-    video,
-    video.videoWidth * 0.55, video.videoHeight * 0.15,
-    video.videoWidth * 0.40, video.videoHeight * 0.65,
-    0, 0, c.width, c.height
-  );
-
-  const img = ctx.getImageData(0, 0, c.width, c.height);
-  const data = img.data;
-
-  let red = 0, blue = 0, yellow = 0, green = 0;
-  for (let i = 0; i < data.length; i += 4) {
-    const r = data[i], g = data[i+1], b = data[i+2];
-    if (r > 180 && g < 80 && b < 80) red++;
-    if (b > 180 && r < 80 && g < 80) blue++;
-    if (r > 180 && g > 180 && b < 80) yellow++;
-    if (g > 180 && r < 80 && b < 80) green++;
-  }
-  return (red > 200) || (blue > 200) || (yellow > 200) || (green > 200);
-}
-
+/* 色判定が取れなくても、リザルト画面のテキスト（ロゴ等）が検知できればOCRを通すように緩和 */
 function isFinalResultScreen(video) {
-  const finalText = detectFinalResultText(video);
-  if (!finalText) return false;
-  if (isTeamBattle()) {
-    return detectTeamColorPanels(video);
-  } else {
-    return true;
-  }
+  return detectFinalResultText(video);
 }
 
 function checkAndStartOcr() {
@@ -523,7 +488,6 @@ function checkAndStartOcr() {
   }
 }
 
-/* 自動OCRループ（多重実行防止ロック付き） */
 async function autoOcrLoop() {
   if (!autoOcrRunning) return;
   
@@ -536,9 +500,6 @@ async function autoOcrLoop() {
       const names  = await ocrNames(video, count);
       const scores = await ocrScores(video, count);
       renderPlayerInputs(names, scores);
-    } else {
-      const scores = await ocrScores(video, 4);
-      renderPlayerInputs(["赤","青","黄","緑"], scores);
     }
     isOcrProcessing = false;
   }
@@ -649,7 +610,6 @@ function preprocessScoreOCR(video, region) {
   return c;
 }
 
-/* スコア用 OCR（安定版 Tesseract.recognize直接呼び出し） */
 async function ocrScoreOnce(video, region) {
   const canvas = preprocessScoreOCR(video, region);
   const { data: { text } } = await Tesseract.recognize(canvas, "eng", { logger: m => {} });
