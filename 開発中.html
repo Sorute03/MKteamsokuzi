@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>MKteamsokuzi ＋ 切り出し枠可視化OCR版</title>
+<title>MKteamsokuzi ＋ 切り出し枠位置調整版</title>
 <link rel="icon" href="data:,">
 <script src="https://unpkg.com/obs-websocket-js"></script>
 <script src="https://unpkg.com/tesseract.js@v4.0.2/dist/tesseract.min.js"></script>
@@ -43,7 +43,6 @@ th, td { border: 1px solid #aaa; padding: 6px; text-align: center; }
   border-radius: 8px;
   margin-bottom: 20px;
 }
-/* プレビューと枠を重ねるためのコンテナ */
 .media-container {
   position: relative;
   display: inline-block;
@@ -55,14 +54,13 @@ th, td { border: 1px solid #aaa; padding: 6px; text-align: center; }
   max-width: 100%;
   max-height: 350px;
 }
-/* 切り出し位置を確認するためのオーバーレイキャンバス */
 #debugCanvas {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  pointer-events: none; /* マウスイベントを透過 */
+  pointer-events: none;
 }
 </style>
 </head>
@@ -84,7 +82,7 @@ th, td { border: 1px solid #aaa; padding: 6px; text-align: center; }
 
   <!-- OCR 統合エリア -->
   <div class="ocr-integration-box">
-    <h3>📷 自動OCR入力（切り出し枠可視化モード）</h3>
+    <h3>📷 自動OCR入力（枠位置調整済み）</h3>
     <div>
       <label>OCRソース選択:</label>
       <select id="sourceType">
@@ -485,7 +483,7 @@ function applyPenalty(team) {
 }
 
 /* ============================================================
-   ★ OCR連動 ＆ 切り出し枠デバッグ描画エンジン
+   ★ OCR連動 ＆ 枠位置調整済みエンジン
 ============================================================ */
 const sourceType = document.getElementById("sourceType");
 const fileInput = document.getElementById("fileInput");
@@ -602,7 +600,6 @@ async function loadCameras() {
   } catch(e) {}
 }
 
-// ★ 切り出し枠（デバッグ用オーバーレイ）をリアルタイムで描画
 function startDebugLoop() {
   if (debugAnimId) cancelAnimationFrame(debugAnimId);
 
@@ -611,6 +608,17 @@ function startDebugLoop() {
     debugAnimId = requestAnimationFrame(loop);
   }
   loop();
+}
+
+// ★ 調整された切り出し座標定義（右側へシフト）
+function getRegions(w, h, i) {
+  const rowH = h / 12;
+  return {
+    // 順位エリア（黄色枠）
+    rankRegion: { x: w * 0.18, y: rowH * i + (rowH * 0.08), width: w * 0.06, height: rowH * 0.84 },
+    // 名前エリア（緑色枠）
+    nameRegion: { x: w * 0.25, y: rowH * i + (rowH * 0.08), width: w * 0.32, height: rowH * 0.84 }
+  };
 }
 
 function drawDebugOverlay() {
@@ -631,21 +639,18 @@ function drawDebugOverlay() {
 
   if (!showDebugOverlayCheck.checked) return;
 
-  const playerCount = 12;
-  for (let i = 0; i < playerCount; i++) {
-    const rowH = h / playerCount;
+  for (let i = 0; i < 12; i++) {
+    const reg = getRegions(w, h, i);
 
-    // 順位検出エリアの枠（黄色）
-    const rankRegion = { x: w * 0.11, y: rowH * i + (rowH * 0.08), width: w * 0.06, height: rowH * 0.84 };
+    // 順位枠（黄色）
     ctx.strokeStyle = "rgba(255, 255, 0, 0.8)";
     ctx.lineWidth = 3;
-    ctx.strokeRect(rankRegion.x, rankRegion.y, rankRegion.width, rankRegion.height);
+    ctx.strokeRect(reg.rankRegion.x, reg.rankRegion.y, reg.rankRegion.width, reg.rankRegion.height);
 
-    // 名前検出エリアの枠（緑色） - ここがプレイヤー名を読むエリアです
-    const nameRegion = { x: w * 0.19, y: rowH * i + (rowH * 0.08), width: w * 0.28, height: rowH * 0.84 };
+    // 名前枠（緑色）
     ctx.strokeStyle = "rgba(0, 255, 0, 0.8)";
     ctx.lineWidth = 3;
-    ctx.strokeRect(nameRegion.x, nameRegion.y, nameRegion.width, nameRegion.height);
+    ctx.strokeRect(reg.nameRegion.x, reg.nameRegion.y, reg.nameRegion.width, reg.nameRegion.height);
   }
 }
 
@@ -675,16 +680,13 @@ async function runOcrProcess() {
   logOcr(`🔍 OCRスキャン開始 [R${targetRound+1}] (解像度: ${w}x${h})...`);
 
   try {
-    const playerCount = 12;
     const detectedResults = [];
 
-    for (let i = 0; i < playerCount; i++) {
-      const rowH = h / playerCount;
-      const rankRegion = { x: w * 0.11, y: rowH * i + (rowH * 0.08), width: w * 0.06, height: rowH * 0.84 };
-      const nameRegion = { x: w * 0.19, y: rowH * i + (rowH * 0.08), width: w * 0.28, height: rowH * 0.84 };
+    for (let i = 0; i < 12; i++) {
+      const reg = getRegions(w, h, i);
 
-      const rankText = await ocrCropTextUltra(media, rankRegion, "eng", "0123456789");
-      const nameText = await ocrCropTextUltra(media, nameRegion, "jpn+eng", null);
+      const rankText = await ocrCropTextUltra(media, reg.rankRegion, "eng", "0123456789");
+      const nameText = await ocrCropTextUltra(media, reg.nameRegion, "jpn+eng", null);
 
       const rankNum = parseInt(rankText.replace(/\D/g, "")) || (i + 1);
       let cleanName = nameText
