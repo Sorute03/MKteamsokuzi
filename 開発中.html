@@ -82,7 +82,7 @@ th, td { border: 1px solid #aaa; padding: 6px; text-align: center; }
 
   <!-- OCR 統合エリア -->
   <div class="ocr-integration-box">
-    <h3>📷 自動OCR入力（枠位置調整済み）</h3>
+    <h3>📷 自動OCR入力（枠位置さらに右調整版）</h3>
     <div>
       <label>OCRソース選択:</label>
       <select id="sourceType">
@@ -483,7 +483,7 @@ function applyPenalty(team) {
 }
 
 /* ============================================================
-   ★ OCR連動 ＆ 枠位置調整済みエンジン
+   ★ OCR連動 ＆ さらに右側に調整した切り出し座標
 ============================================================ */
 const sourceType = document.getElementById("sourceType");
 const fileInput = document.getElementById("fileInput");
@@ -610,14 +610,14 @@ function startDebugLoop() {
   loop();
 }
 
-// ★ 調整された切り出し座標定義（右側へシフト）
+// ★ さらに右側へシフトした切り出し座標（必要に応じて微調整可能）
 function getRegions(w, h, i) {
   const rowH = h / 12;
   return {
     // 順位エリア（黄色枠）
-    rankRegion: { x: w * 0.18, y: rowH * i + (rowH * 0.08), width: w * 0.06, height: rowH * 0.84 },
+    rankRegion: { x: w * 0.22, y: rowH * i + (rowH * 0.08), width: w * 0.06, height: rowH * 0.84 },
     // 名前エリア（緑色枠）
-    nameRegion: { x: w * 0.25, y: rowH * i + (rowH * 0.08), width: w * 0.32, height: rowH * 0.84 }
+    nameRegion: { x: w * 0.29, y: rowH * i + (rowH * 0.08), width: w * 0.32, height: rowH * 0.84 }
   };
 }
 
