@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>MKteamsokuzi ＋ 切り出し枠位置調整版</title>
+<title>MKteamsokuzi ＋ 切り出し枠右半分配置版</title>
 <link rel="icon" href="data:,">
 <script src="https://unpkg.com/obs-websocket-js"></script>
 <script src="https://unpkg.com/tesseract.js@v4.0.2/dist/tesseract.min.js"></script>
@@ -82,7 +82,7 @@ th, td { border: 1px solid #aaa; padding: 6px; text-align: center; }
 
   <!-- OCR 統合エリア -->
   <div class="ocr-integration-box">
-    <h3>📷 自動OCR入力（枠位置さらに右調整版）</h3>
+    <h3>📷 自動OCR入力（右半分配置版）</h3>
     <div>
       <label>OCRソース選択:</label>
       <select id="sourceType">
@@ -422,7 +422,12 @@ function toggleRankSelection(round, team, pos, btnElem) {
 }
 
 function getPointsByRank(rank) {
-  const table = {1:15, 2:12, 3:10, 4:9, 5:8, 6:7, 7:6, 8:5, 9:4, 10:3, 11:2, 12:1};
+  const table = {
+    1: 15,  2: 12,  3: 10, 4: 9,  5: 9,  6: 8,
+    7: 8,   8: 7,   9: 7,  10: 6, 11: 6, 12: 6,
+    13: 5, 14: 5, 15: 5, 16: 4, 17: 4, 18: 4,
+    19: 3, 20: 3, 21: 3, 22: 2, 23: 2, 24: 1
+  };
   return table[rank] || 0;
 }
 
@@ -483,7 +488,7 @@ function applyPenalty(team) {
 }
 
 /* ============================================================
-   ★ OCR連動 ＆ さらに右側に調整した切り出し座標
+   ★ OCR連動 ＆ 右半分（50%〜）配置の切り出し座標
 ============================================================ */
 const sourceType = document.getElementById("sourceType");
 const fileInput = document.getElementById("fileInput");
@@ -610,14 +615,14 @@ function startDebugLoop() {
   loop();
 }
 
-// ★ さらに右側へシフトした切り出し座標（必要に応じて微調整可能）
+// ★ 画面の右半分（50%〜）に配置した切り出し座標定義
 function getRegions(w, h, i) {
   const rowH = h / 12;
   return {
-    // 順位エリア（黄色枠）
-    rankRegion: { x: w * 0.22, y: rowH * i + (rowH * 0.08), width: w * 0.06, height: rowH * 0.84 },
-    // 名前エリア（緑色枠）
-    nameRegion: { x: w * 0.29, y: rowH * i + (rowH * 0.08), width: w * 0.32, height: rowH * 0.84 }
+    // 順位エリア（黄色枠：画面中央より右側50%位置）
+    rankRegion: { x: w * 0.50, y: rowH * i + (rowH * 0.08), width: w * 0.06, height: rowH * 0.84 },
+    // 名前エリア（緑色枠：画面中央より右側57%位置）
+    nameRegion: { x: w * 0.57, y: rowH * i + (rowH * 0.08), width: w * 0.32, height: rowH * 0.84 }
   };
 }
 
