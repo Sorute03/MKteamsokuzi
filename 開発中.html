@@ -82,7 +82,7 @@ th, td { border: 1px solid #aaa; padding: 6px; text-align: center; }
 
   <!-- OCR 統合エリア -->
   <div class="ocr-integration-box">
-    <h3>📷 自動OCR入力（右半分配置版）</h3>
+    <h3>📷 自動OCR入力（順位枠スライド調整版）</h3>
     <div>
       <label>OCRソース選択:</label>
       <select id="sourceType">
@@ -488,7 +488,7 @@ function applyPenalty(team) {
 }
 
 /* ============================================================
-   ★ OCR連動 ＆ 右半分（50%〜）配置の切り出し座標
+   ★ OCR連動 ＆ 順位枠を右へ1個分スライドした切り出し座標
 ============================================================ */
 const sourceType = document.getElementById("sourceType");
 const fileInput = document.getElementById("fileInput");
@@ -615,14 +615,14 @@ function startDebugLoop() {
   loop();
 }
 
-// ★ 画面の右半分（50%〜）に配置した切り出し座標定義
+// ★ 順位枠（黄色）を右へ1個分スライドした切り出し座標定義
 function getRegions(w, h, i) {
   const rowH = h / 12;
   return {
-    // 順位エリア（黄色枠：画面中央より右側50%位置）
-    rankRegion: { x: w * 0.50, y: rowH * i + (rowH * 0.08), width: w * 0.06, height: rowH * 0.84 },
-    // 名前エリア（緑色枠：画面中央より右側57%位置）
-    nameRegion: { x: w * 0.57, y: rowH * i + (rowH * 0.08), width: w * 0.32, height: rowH * 0.84 }
+    // 順位エリア（黄色枠：横幅 0.06分だけ右にシフトして 56% 位置へ）
+    rankRegion: { x: w * 0.56, y: rowH * i + (rowH * 0.08), width: w * 0.06, height: rowH * 0.84 },
+    // 名前エリア（緑色枠：順位枠の右隣 63% 位置へ）
+    nameRegion: { x: w * 0.63, y: rowH * i + (rowH * 0.08), width: w * 0.30, height: rowH * 0.84 }
   };
 }
 
