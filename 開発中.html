@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>MKteamsokuzi ＋ 切り出し枠隙間詰め版</title>
+<title>MKteamsokuzi ＋ 行間隙間詰め版</title>
 <link rel="icon" href="data:,">
 <script src="https://unpkg.com/obs-websocket-js"></script>
 <script src="https://unpkg.com/tesseract.js@v4.0.2/dist/tesseract.min.js"></script>
@@ -82,7 +82,7 @@ th, td { border: 1px solid #aaa; padding: 6px; text-align: center; }
 
   <!-- OCR 統合エリア -->
   <div class="ocr-integration-box">
-    <h3>📷 自動OCR入力（隙間詰めスリム版）</h3>
+    <h3>📷 自動OCR入力（行間隙間詰め版）</h3>
     <div>
       <label>OCRソース選択:</label>
       <select id="sourceType">
@@ -488,7 +488,7 @@ function applyPenalty(team) {
 }
 
 /* ============================================================
-   ★ OCR連動 ＆ 位置そのまま・隙間を詰めた切り出し座標
+   ★ OCR連動 ＆ 行間（上下の隙間）を完全に埋めた切り出し座標
 ============================================================ */
 const sourceType = document.getElementById("sourceType");
 const fileInput = document.getElementById("fileInput");
@@ -615,14 +615,14 @@ function startDebugLoop() {
   loop();
 }
 
-// ★ 位置はそのままで縦幅の隙間を詰めた切り出し座標定義 (heightを 0.56 → 0.46 にスリム化)
+// ★ 位置をそのままに、高さを 1行分の高さ（rowH）いっぱいに広げて行間の隙間を完全に埋める
 function getRegions(w, h, i) {
   const rowH = h / 12;
   return {
-    // 順位エリア（黄色枠）
-    rankRegion: { x: w * 0.56, y: rowH * i + (rowH * 0.28), width: w * 0.06, height: rowH * 0.46 },
+    // 順位エリア（黄色枠：高さ高をrowHにして隙間をなくす）
+    rankRegion: { x: w * 0.56, y: rowH * i, width: w * 0.06, height: rowH },
     // 名前エリア（緑色枠）
-    nameRegion: { x: w * 0.63, y: rowH * i + (rowH * 0.28), width: w * 0.30, height: rowH * 0.46 }
+    nameRegion: { x: w * 0.63, y: rowH * i, width: w * 0.30, height: rowH }
   };
 }
 
