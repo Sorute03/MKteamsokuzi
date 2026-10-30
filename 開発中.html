@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>MKteamsokuzi ＋ 修正完了版</title>
+<title>MKteamsokuzi ＋ 堅牢化対応版</title>
 <link rel="icon" href="data:,">
 <script src="https://unpkg.com/obs-websocket-js"></script>
 <script src="https://unpkg.com/tesseract.js@v4.0.2/dist/tesseract.min.js"></script>
@@ -554,7 +554,7 @@ function applyPenalty(team) {
 }
 
 /* ============================================================
-   ★ OCR連動 ＆ 行間隙間詰め切り出し座標
+   ★ OCR連動 ＆ 安全ガード付き初期化
 ============================================================ */
 let sourceType, fileInput, cameraBox, cameraSelect, startCamBtn, video, imagePreview, debugCanvas, ocrLog, ocrTargetRoundSelect, autoOcrCheck, autoAdvanceCheck, showDebugOverlayCheck, runOcrBtn;
 
@@ -579,68 +579,81 @@ function setupOcrSourceUI() {
   showDebugOverlayCheck = document.getElementById("showDebugOverlay");
   runOcrBtn = document.getElementById("runOcrBtn");
 
-  if (!sourceType || !video) return;
-
-  sourceType.onchange = () => {
-    stopAutoOcr();
-    if (sourceType.value === "camera") {
-      fileInput.style.display = "none";
-      cameraBox.style.display = "block";
-      video.style.display = "block";
-      imagePreview.style.display = "none";
-    } else if (sourceType.value === "video") {
-      cameraBox.style.display = "none";
-      fileInput.style.display = "inline-block";
-      video.style.display = "block";
-      imagePreview.style.display = "none";
-    } else {
-      cameraBox.style.display = "none";
-      fileInput.style.display = "inline-block";
-      video.style.display = "none";
-      imagePreview.style.display = "block";
-    }
-    startDebugLoop();
-  };
-
-  fileInput.onchange = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    const url = URL.createObjectURL(file);
-    if (sourceType.value === "video") {
-      video.srcObject = null;
-      video.src = url;
-      video.controls = true;
-      await video.play().catch(e => {});
-    } else {
-      const img = new Image();
-      img.onload = () => {
-        loadedImage = img;
-        imagePreview.src = url;
-        startDebugLoop();
-      };
-      img.src = url;
-    }
-  };
-
-  startCamBtn.onclick = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: { exact: cameraSelect.value }, width: { ideal: 1920 }, height: { ideal: 1080 } } });
-      video.srcObject = stream;
-      video.controls = false;
-      await video.play();
-      startDebugLoop();
-    } catch(e) { alert("カメラ起動失敗: "+e); }
-  };
-
-  autoOcrCheck.onchange = () => {
-    if (autoOcrCheck.checked) {
-      autoOcrTimer = setInterval(() => { runOcrProcess(); }, 3000);
-    } else {
+  if (sourceType) {
+    sourceType.onchange = () => {
       stopAutoOcr();
-    }
-  };
+      if (sourceType.value === "camera") {
+        if (fileInput) fileInput.style.display = "none";
+        if (cameraBox) cameraBox.style.display = "block";
+        if (video) video.style.display = "block";
+        if (imagePreview) imagePreview.style.display = "none";
+      } else if (sourceType.value === "video") {
+        if (cameraBox) cameraBox.style.display = "none";
+        if (fileInput) fileInput.style.display = "inline-block";
+        if (video) video.style.display = "block";
+        if (imagePreview) imagePreview.style.display = "none";
+      } else {
+        if (cameraBox) cameraBox.style.display = "none";
+        if (fileInput) fileInput.style.display = "inline-block";
+        if (video) video.style.display = "none";
+        if (imagePreview) imagePreview.style.display = "block";
+      }
+      startDebugLoop();
+    };
+  }
 
-  video.onloadedmetadata = () => { startDebugLoop(); };
+  if (fileInput) {
+    fileInput.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const url = URL.createObjectURL(file);
+      if (sourceType && sourceType.value === "video") {
+        if (video) {
+          video.srcObject = null;
+          video.src = url;
+          video.controls = true;
+          await video.play().catch(e => {});
+        }
+      } else {
+        const img = new Image();
+        img.onload = () => {
+          loadedImage = img;
+          if (imagePreview) imagePreview.src = url;
+          startDebugLoop();
+        };
+        img.src = url;
+      }
+    };
+  }
+
+  if (startCamBtn) {
+    startCamBtn.onclick = async () => {
+      try {
+        const deviceId = cameraSelect ? cameraSelect.value : undefined;
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: deviceId ? { exact: deviceId } : undefined, width: { ideal: 1920 }, height: { ideal: 1080 } } });
+        if (video) {
+          video.srcObject = stream;
+          video.controls = false;
+          await video.play();
+        }
+        startDebugLoop();
+      } catch(e) { alert("カメラ起動失敗: "+e); }
+    };
+  }
+
+  if (autoOcrCheck) {
+    autoOcrCheck.onchange = () => {
+      if (autoOcrCheck.checked) {
+        autoOcrTimer = setInterval(() => { runOcrProcess(); }, 3000);
+      } else {
+        stopAutoOcr();
+      }
+    };
+  }
+
+  if (video) {
+    video.onloadedmetadata = () => { startDebugLoop(); };
+  }
 }
 
 function updateOcrRoundSelect() {
@@ -731,7 +744,6 @@ function drawDebugOverlay() {
   }
 }
 
-// 従来の Tesseract OCR 処理
 async function runOcrProcess() {
   if (isOcrRunning) return;
   isOcrRunning = true;
@@ -821,7 +833,6 @@ async function ocrCropTextUltra(media, region, lang, whitelist) {
   return text.trim();
 }
 
-// ★ 修正：正しいモデル名（gemini-1.5-flash）を使用したGemini Vision API OCR
 async function runGeminiVisionOcrProcess() {
   const apiKeyInput = document.getElementById("geminiApiKeyInput");
   const apiKey = apiKeyInput ? apiKeyInput.value.trim() : "";
@@ -859,7 +870,6 @@ async function runGeminiVisionOcrProcess() {
   try {
     const promptText = "このマリオカートのリザルト画面の右半分に表示されている1位から12位までの順位とプレイヤー名を読み取ってください。JSONの配列形式（例: [{\"rank\": 1, \"name\": \"...\"}, ...]）のみで正確に出力してください。";
 
-    // モデル名を安定稼働する gemini-1.5-flash に修正
     const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
